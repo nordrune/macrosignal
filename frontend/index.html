@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MacroSignal Backtester</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <p class="eyebrow">University MVP</p>
+      <h1>MacroSignal Backtester</h1>
+    </div>
+    <div class="rules-summary" aria-label="Backtest rules">
+      <span id="ruleCapital">Capital: $10,000</span>
+      <span id="ruleWindow">SMA: 20</span>
+      <span id="ruleFee">Fee: 0.1%</span>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <section class="input-panel" aria-labelledby="input-title">
+      <div class="panel-heading">
+        <div>
+          <h2 id="input-title">CSV Input</h2>
+          <p>Required columns: date, close</p>
+        </div>
+        <label class="file-control">
+          <input id="csvFile" type="file" accept=".csv,text/csv">
+          Upload CSV
+        </label>
+      </div>
+
+      <div class="settings-grid" aria-label="Backtest settings">
+        <label>
+          <span>Start capital</span>
+          <input id="startingCapital" type="number" min="1" step="100" value="10000">
+        </label>
+        <label>
+          <span>SMA window</span>
+          <input id="movingAverageWindow" type="number" min="1" step="1" value="20">
+        </label>
+        <label>
+          <span>Fee percent</span>
+          <input id="feeRate" type="number" min="0" step="0.01" value="0.1">
+        </label>
+        <label class="toggle-control">
+          <input id="autoRun" type="checkbox" checked>
+          <span>Auto-run</span>
+        </label>
+      </div>
+
+      <div id="dropZone" class="drop-zone">
+        <strong>CSV file</strong>
+        <span>Drop file or edit below</span>
+      </div>
+
+      <textarea id="csvText" spellcheck="false" aria-label="CSV price data"></textarea>
+
+      <div class="action-row">
+        <button id="runButton" type="button">Run Backtest</button>
+        <button id="sampleButton" class="secondary-button" type="button">Load Sample</button>
+      </div>
+
+      <p id="statusMessage" class="status-message" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="results-panel" aria-labelledby="results-title">
+      <div class="panel-heading">
+        <div>
+          <h2 id="results-title">Results</h2>
+          <p id="dataSummary">No run yet</p>
+        </div>
+      </div>
+
+      <div class="metrics-grid" aria-label="Backtest performance">
+        <article class="metric">
+          <span>Start capital</span>
+          <strong id="startCapital">$0.00</strong>
+        </article>
+        <article class="metric">
+          <span>End capital</span>
+          <strong id="endCapital">$0.00</strong>
+        </article>
+        <article class="metric">
+          <span>Profit/Loss</span>
+          <strong id="profitLoss">$0.00</strong>
+        </article>
+        <article class="metric">
+          <span>Return</span>
+          <strong id="profitLossPercent">0.00%</strong>
+        </article>
+        <article class="metric">
+          <span>Buy trades</span>
+          <strong id="buyTrades">0</strong>
+        </article>
+        <article class="metric">
+          <span>Sell trades</span>
+          <strong id="sellTrades">0</strong>
+        </article>
+      </div>
+
+      <div class="status-strip">
+        <span>Final status</span>
+        <strong id="finalStatus">holding cash</strong>
+      </div>
+
+      <div class="chart-wrap" aria-label="Price and moving average chart">
+        <canvas id="priceChart"></canvas>
+        <div id="chartTooltip" class="chart-tooltip" hidden></div>
+      </div>
+
+      <div class="legend" aria-label="Chart legend">
+        <span><i class="price-line"></i>Close</span>
+        <span><i class="average-line"></i>Moving average</span>
+        <span><i class="buy-dot"></i>Buy</span>
+        <span><i class="sell-dot"></i>Sell</span>
+      </div>
+
+      <div class="inspector" aria-label="Selected data point">
+        <div>
+          <span>Date</span>
+          <strong id="selectedDate">No point selected</strong>
+        </div>
+        <div>
+          <span>Close</span>
+          <strong id="selectedClose">-</strong>
+        </div>
+        <div>
+          <span>SMA</span>
+          <strong id="selectedAverage">-</strong>
+        </div>
+        <div>
+          <span>Signal</span>
+          <strong id="selectedSignal">-</strong>
+        </div>
+      </div>
+    </section>
+
+    <section class="table-panel" aria-labelledby="trades-title">
+      <div class="panel-heading">
+        <div>
+          <h2 id="trades-title">Trade Log</h2>
+          <p>Virtual trades only</p>
+        </div>
+      </div>
+
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Price</th>
+              <th>Units</th>
+              <th>Fee</th>
+              <th>Cash</th>
+            </tr>
+          </thead>
+          <tbody id="tradeTableBody">
+            <tr>
+              <td colspan="6">Run the backtest to populate the trade log.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
