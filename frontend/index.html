@@ -3,170 +3,423 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MacroSignal Backtester</title>
+  <title>MacroSignal Pro - Advanced Trading Bot & Backtester</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <header class="app-header">
-    <div>
-      <p class="eyebrow">University MVP</p>
-      <h1>MacroSignal Backtester</h1>
+    <div class="header-logo">
+      <p class="eyebrow">University Software Engineering MVP</p>
+      <h1>MacroSignal <span>Pro</span></h1>
     </div>
-    <div class="rules-summary" aria-label="Backtest rules">
-      <span id="ruleCapital">Capital: $10,000</span>
-      <span id="ruleWindow">SMA: 20</span>
-      <span id="ruleFee">Fee: 0.1%</span>
+    <div class="active-config" aria-label="Current strategy configurations">
+      <span id="activeStrategy">Strategy: SMA</span>
+      <span id="activeTicker">Ticker: AAPL</span>
+      <span id="activeFee">Fee: 0.1%</span>
     </div>
   </header>
 
-  <main class="workspace">
-    <section class="input-panel" aria-labelledby="input-title">
-      <div class="panel-heading">
-        <div>
-          <h2 id="input-title">CSV Input</h2>
-          <p>Required columns: date, close</p>
+  <main class="dashboard-grid">
+    <!-- Panel 1: Sidebar Controls -->
+    <section class="control-panel" aria-labelledby="controls-title">
+      <h2 id="controls-title" class="section-title">Configuration</h2>
+
+      <!-- Toggle Source: API vs CSV -->
+      <div class="source-toggle-wrap">
+        <span class="toggle-label">Data Source</span>
+        <div class="toggle-buttons">
+          <button id="sourceApiBtn" class="source-btn active" type="button">Yahoo Finance API</button>
+          <button id="sourceCsvBtn" class="source-btn" type="button">Local CSV File</button>
         </div>
-        <label class="file-control">
-          <input id="csvFile" type="file" accept=".csv,text/csv">
-          Upload CSV
-        </label>
       </div>
 
-      <div class="settings-grid" aria-label="Backtest settings">
-        <label>
-          <span>Start capital</span>
+      <!-- Settings Block for API Source -->
+      <div id="apiSettings" class="settings-block active">
+        <div class="input-group">
+          <label for="tickerInput">Ticker Symbol</label>
+          <div class="search-wrap">
+            <input id="tickerInput" type="text" placeholder="e.g. AAPL, BTC-USD, EURUSD=X" value="BTC-USD">
+            <button id="fetchDataBtn" type="button">Fetch</button>
+          </div>
+          <div class="ticker-suggestions">
+            <button class="suggestion-token" data-ticker="BTC-USD" type="button">BTC</button>
+            <button class="suggestion-token" data-ticker="ETH-USD" type="button">ETH</button>
+            <button class="suggestion-token" data-ticker="AAPL" type="button">AAPL</button>
+            <button class="suggestion-token" data-ticker="TSLA" type="button">TSLA</button>
+            <button class="suggestion-token" data-ticker="EURUSD=X" type="button">EUR/USD</button>
+          </div>
+        </div>
+
+        <div class="settings-row-2">
+          <div class="input-group">
+            <label for="periodSelect">Period</label>
+            <select id="periodSelect">
+              <option value="1mo">1 Month</option>
+              <option value="3mo">3 Months</option>
+              <option value="6mo">6 Months</option>
+              <option value="1y" selected>1 Year</option>
+              <option value="2y">2 Years</option>
+              <option value="5y">5 Years</option>
+              <option value="max">Max</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label for="intervalSelect">Interval</label>
+            <select id="intervalSelect">
+              <option value="1h">1 Hour</option>
+              <option value="1d" selected>1 Day</option>
+              <option value="1wk">1 Week</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings Block for CSV Source -->
+      <div id="csvSettings" class="settings-block">
+        <div class="panel-heading-inline">
+          <span class="subtitle">Upload or paste csv data (cols: date, close)</span>
+          <label class="file-control">
+            <input id="csvFile" type="file" accept=".csv,text/csv">
+            Upload CSV
+          </label>
+        </div>
+        <div id="dropZone" class="drop-zone">
+          <span>Drag & Drop CSV file here or edit below</span>
+        </div>
+        <textarea id="csvText" spellcheck="false" placeholder="date,close&#10;2024-01-01,100.00&#10;2024-01-02,101.50" aria-label="CSV data"></textarea>
+      </div>
+
+      <!-- Strategy Selection -->
+      <div class="input-group">
+        <label for="strategySelect">Trading Strategy</label>
+        <select id="strategySelect">
+          <option value="sma" selected>Simple Moving Average (SMA) Crossover</option>
+          <option value="ema">Exponential Moving Average (EMA) Crossover</option>
+          <option value="rsi">Relative Strength Index (RSI)</option>
+          <option value="macd">MACD Crossover</option>
+          <option value="bollinger">Bollinger Bands Mean Reversion</option>
+          <option value="combined">Combined SMA + RSI Master Strategy</option>
+        </select>
+      </div>
+
+      <!-- Dynamic Strategy Parameter Blocks -->
+      <div id="strategyParamsContainer" class="strategy-params-panel">
+        
+        <!-- SMA Params -->
+        <div id="params_sma" class="param-group active">
+          <div class="input-group">
+            <label for="sma_window">SMA Window (Periods)</label>
+            <input id="sma_window" type="number" min="1" step="1" value="20">
+          </div>
+        </div>
+
+        <!-- EMA Params -->
+        <div id="params_ema" class="param-group">
+          <div class="input-group">
+            <label for="ema_window">EMA Window (Periods)</label>
+            <input id="ema_window" type="number" min="1" step="1" value="20">
+          </div>
+        </div>
+
+        <!-- RSI Params -->
+        <div id="params_rsi" class="param-group">
+          <div class="settings-row-3">
+            <div class="input-group">
+              <label for="rsi_window">RSI Period</label>
+              <input id="rsi_window" type="number" min="1" step="1" value="14">
+            </div>
+            <div class="input-group">
+              <label for="rsi_buy">Buy Threshold (Oversold)</label>
+              <input id="rsi_buy" type="number" min="1" max="99" step="1" value="30">
+            </div>
+            <div class="input-group">
+              <label for="rsi_sell">Sell Threshold (Overbought)</label>
+              <input id="rsi_sell" type="number" min="1" max="99" step="1" value="70">
+            </div>
+          </div>
+        </div>
+
+        <!-- MACD Params -->
+        <div id="params_macd" class="param-group">
+          <div class="settings-row-3">
+            <div class="input-group">
+              <label for="macd_fast">Fast Period</label>
+              <input id="macd_fast" type="number" min="1" step="1" value="12">
+            </div>
+            <div class="input-group">
+              <label for="macd_slow">Slow Period</label>
+              <input id="macd_slow" type="number" min="1" step="1" value="26">
+            </div>
+            <div class="input-group">
+              <label for="macd_signal">Signal Period</label>
+              <input id="macd_signal" type="number" min="1" step="1" value="9">
+            </div>
+          </div>
+        </div>
+
+        <!-- Bollinger Bands Params -->
+        <div id="params_bollinger" class="param-group">
+          <div class="settings-row-2">
+            <div class="input-group">
+              <label for="bb_window">BB Window</label>
+              <input id="bb_window" type="number" min="1" step="1" value="20">
+            </div>
+            <div class="input-group">
+              <label for="bb_std">Std Dev Multiplier</label>
+              <input id="bb_std" type="number" min="0.1" step="0.1" value="2.0">
+            </div>
+          </div>
+        </div>
+
+        <!-- Combined Params -->
+        <div id="params_combined" class="param-group">
+          <div class="settings-row-2">
+            <div class="input-group">
+              <label for="comb_sma_window">SMA Filter Window</label>
+              <input id="comb_sma_window" type="number" min="1" step="1" value="20">
+            </div>
+            <div class="input-group">
+              <label for="comb_rsi_window">RSI Period</label>
+              <input id="comb_rsi_window" type="number" min="1" step="1" value="14">
+            </div>
+          </div>
+          <div class="settings-row-2">
+            <div class="input-group">
+              <label for="comb_rsi_buy">RSI Buy Filter (Oversold)</label>
+              <input id="comb_rsi_buy" type="number" min="1" max="99" step="1" value="50">
+            </div>
+            <div class="input-group">
+              <label for="comb_rsi_sell">RSI Sell Filter (Overbought)</label>
+              <input id="comb_rsi_sell" type="number" min="1" max="99" step="1" value="70">
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- General Backtester Params -->
+      <div class="settings-row-2">
+        <div class="input-group">
+          <label for="startingCapital">Starting Capital</label>
           <input id="startingCapital" type="number" min="1" step="100" value="10000">
-        </label>
-        <label>
-          <span>SMA window</span>
-          <input id="movingAverageWindow" type="number" min="1" step="1" value="20">
-        </label>
-        <label>
-          <span>Fee percent</span>
+        </div>
+        <div class="input-group">
+          <label for="feeRate">Transaction Fee (%)</label>
           <input id="feeRate" type="number" min="0" step="0.01" value="0.1">
-        </label>
+        </div>
+      </div>
+
+      <div class="auto-run-row">
         <label class="toggle-control">
           <input id="autoRun" type="checkbox" checked>
-          <span>Auto-run</span>
+          <span class="custom-checkbox"></span>
+          <span>Auto-run on changes</span>
         </label>
       </div>
 
-      <div id="dropZone" class="drop-zone">
-        <strong>CSV file</strong>
-        <span>Drop file or edit below</span>
-      </div>
-
-      <textarea id="csvText" spellcheck="false" aria-label="CSV price data"></textarea>
-
       <div class="action-row">
-        <button id="runButton" type="button">Run Backtest</button>
-        <button id="sampleButton" class="secondary-button" type="button">Load Sample</button>
+        <button id="runButton" class="primary-btn" type="button">Run Backtest</button>
+        <button id="optimizeBtn" class="accent-btn" type="button">Optimize Params</button>
+        <button id="loadSampleBtn" class="secondary-btn" type="button">Load CSV Sample</button>
       </div>
 
-      <p id="statusMessage" class="status-message" role="status" aria-live="polite"></p>
+      <div id="statusMessage" class="status-msg" role="status" aria-live="polite"></div>
     </section>
 
+    <!-- Panel 2: Performance Results & Visual Charts -->
     <section class="results-panel" aria-labelledby="results-title">
-      <div class="panel-heading">
-        <div>
-          <h2 id="results-title">Results</h2>
-          <p id="dataSummary">No run yet</p>
-        </div>
+      <div class="panel-header-inline">
+        <h2 id="results-title" class="section-title">Backtest Results</h2>
+        <span id="dataSummary" class="data-summary">No run yet</span>
       </div>
 
-      <div class="metrics-grid" aria-label="Backtest performance">
-        <article class="metric">
-          <span>Start capital</span>
+      <!-- Metrics Grid (Advanced Financial/Risk metrics) -->
+      <div class="metrics-grid" aria-label="Performance metrics">
+        <article class="metric-card">
+          <span class="card-label">Start Capital</span>
           <strong id="startCapital">$0.00</strong>
         </article>
-        <article class="metric">
-          <span>End capital</span>
+        <article class="metric-card">
+          <span class="card-label">End Capital</span>
           <strong id="endCapital">$0.00</strong>
         </article>
-        <article class="metric">
-          <span>Profit/Loss</span>
+        <article class="metric-card">
+          <span class="card-label">Net Profit / Loss</span>
           <strong id="profitLoss">$0.00</strong>
         </article>
-        <article class="metric">
-          <span>Return</span>
+        <article class="metric-card">
+          <span class="card-label">Strategy Return</span>
           <strong id="profitLossPercent">0.00%</strong>
         </article>
-        <article class="metric">
-          <span>Buy trades</span>
-          <strong id="buyTrades">0</strong>
+        <article class="metric-card">
+          <span class="card-label">Sharpe Ratio</span>
+          <strong id="sharpeRatio">0.00</strong>
         </article>
-        <article class="metric">
-          <span>Sell trades</span>
-          <strong id="sellTrades">0</strong>
+        <article class="metric-card">
+          <span class="card-label">Max Drawdown</span>
+          <strong id="maxDrawdown">0.00%</strong>
+        </article>
+        <article class="metric-card">
+          <span class="card-label">Win Rate</span>
+          <strong id="winRate">0.00%</strong>
+        </article>
+        <article class="metric-card">
+          <span class="card-label">Buy & Hold Return</span>
+          <strong id="buyAndHoldReturn">0.00%</strong>
+        </article>
+        <article class="metric-card">
+          <span class="card-label">Trades (Buy/Sell)</span>
+          <strong id="tradeCount">0 (0 / 0)</strong>
         </article>
       </div>
 
-      <div class="status-strip">
-        <span>Final status</span>
-        <strong id="finalStatus">holding cash</strong>
+      <div class="status-ribbon">
+        <span class="status-label">Current Position Status</span>
+        <strong id="finalStatus" class="status-value">holding cash</strong>
       </div>
 
-      <div class="chart-wrap" aria-label="Price and moving average chart">
-        <canvas id="priceChart"></canvas>
-        <div id="chartTooltip" class="chart-tooltip" hidden></div>
-      </div>
-
-      <div class="legend" aria-label="Chart legend">
-        <span><i class="price-line"></i>Close</span>
-        <span><i class="average-line"></i>Moving average</span>
-        <span><i class="buy-dot"></i>Buy</span>
-        <span><i class="sell-dot"></i>Sell</span>
-      </div>
-
-      <div class="inspector" aria-label="Selected data point">
-        <div>
-          <span>Date</span>
-          <strong id="selectedDate">No point selected</strong>
+      <!-- Double Panel Chart Container -->
+      <div class="double-chart-container">
+        <!-- Main Price Chart Panel -->
+        <div class="chart-wrapper main-chart" aria-label="Asset Price and Strategy Indicators Chart">
+          <canvas id="priceChart"></canvas>
+          <div id="chartTooltip" class="chart-tooltip" hidden></div>
         </div>
-        <div>
-          <span>Close</span>
+        
+        <!-- Sub Indicator Chart Panel (RSI, MACD, Drawdown) -->
+        <div class="chart-wrapper sub-chart" aria-label="Sub-Indicator Panel">
+          <canvas id="indicatorChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Chart Legend -->
+      <div class="legend-row" aria-label="Chart legends">
+        <span><i class="legend-line close-line"></i>Price</span>
+        <span id="maLegend"><i class="legend-line indicator-line"></i>Indicator</span>
+        <span id="bbUpperLegend" hidden><i class="legend-line bb-upper-line"></i>BB Upper</span>
+        <span id="bbLowerLegend" hidden><i class="legend-line bb-lower-line"></i>BB Lower</span>
+        <span><i class="legend-dot buy-dot"></i>Buy Sign</span>
+        <span><i class="legend-dot sell-dot"></i>Sell Sign</span>
+      </div>
+
+      <!-- Point Inspector -->
+      <div class="point-inspector" aria-label="Point information">
+        <div class="inspect-cell">
+          <span class="inspect-label">Selected Date</span>
+          <strong id="selectedDate">Hover over chart</strong>
+        </div>
+        <div class="inspect-cell">
+          <span class="inspect-label">Close Price</span>
           <strong id="selectedClose">-</strong>
         </div>
-        <div>
-          <span>SMA</span>
+        <div class="inspect-cell">
+          <span class="inspect-label">Indicator Value</span>
           <strong id="selectedAverage">-</strong>
         </div>
-        <div>
-          <span>Signal</span>
+        <div class="inspect-cell">
+          <span class="inspect-label">Signal Generated</span>
           <strong id="selectedSignal">-</strong>
         </div>
       </div>
     </section>
 
+    <!-- Panel 3: Trade Log Log Table -->
     <section class="table-panel" aria-labelledby="trades-title">
-      <div class="panel-heading">
-        <div>
-          <h2 id="trades-title">Trade Log</h2>
-          <p>Virtual trades only</p>
-        </div>
+      <div class="panel-header-inline">
+        <h2 id="trades-title" class="section-title">Trade Log</h2>
+        <span class="subtitle">Virtual simulated order history</span>
       </div>
 
-      <div class="table-scroll">
-        <table>
+      <div class="table-scroll-container">
+        <table class="trade-log-table">
           <thead>
             <tr>
-              <th>Date</th>
-              <th>Type</th>
-              <th>Price</th>
-              <th>Units</th>
-              <th>Fee</th>
-              <th>Cash</th>
+              <th>Timestamp</th>
+              <th>Transaction</th>
+              <th>Execution Price</th>
+              <th>Shares / Units</th>
+              <th>Fee Paid</th>
+              <th>Equity Cash Balance</th>
             </tr>
           </thead>
           <tbody id="tradeTableBody">
             <tr>
-              <td colspan="6">Run the backtest to populate the trade log.</td>
+              <td colspan="6" class="empty-table-msg">Run backtest to populate trade log.</td>
             </tr>
           </tbody>
         </table>
       </div>
+
+      <!-- Trade Detail Inspector Panel -->
+      <div id="tradeInspectorPanel" class="trade-inspector-panel" hidden>
+        <div class="inspector-header">
+          <h3 class="inspector-title">Trade Detail Inspector</h3>
+          <button id="closeInspectorBtn" class="close-btn" aria-label="Close inspector">&times;</button>
+        </div>
+        <div class="inspector-grid">
+          <div class="inspector-card">
+            <span class="inspector-label">Holding Period</span>
+            <strong id="tradeHoldDays">-</strong>
+          </div>
+          <div class="inspector-card" id="tradeProfitCard">
+            <span class="inspector-label">Trade Net Profit</span>
+            <strong id="tradeNetProfit">-</strong>
+          </div>
+          <div class="inspector-card" id="tradeRoiCard">
+            <span class="inspector-label">Trade ROI</span>
+            <strong id="tradeRoi">-</strong>
+          </div>
+          <div class="inspector-card">
+            <span class="inspector-label">Fees Paid</span>
+            <strong id="tradeFees">-</strong>
+          </div>
+        </div>
+      </div>
     </section>
   </main>
+
+  <!-- Parameter Optimization Modal -->
+  <div id="optimizationModal" class="modal-overlay" hidden>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Parameter Grid Sweep Optimizer</h2>
+        <button id="closeOptimizeModalBtn" class="close-btn" aria-label="Close optimization modal">&times;</button>
+      </div>
+      <p class="modal-desc">Evaluating performance metrics across a grid of parameter combinations for the active strategy...</p>
+      
+      <div id="optimizerLoading" class="optimizer-loading" hidden>
+        <div class="spinner"></div>
+        <span>Backtesting configurations...</span>
+      </div>
+
+      <div id="optimizerResults" class="optimizer-results-container" hidden>
+        <table class="optimize-results-table">
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Parameters</th>
+              <th>Final Capital</th>
+              <th>Net Return</th>
+              <th>Sharpe Ratio</th>
+              <th>Max Drawdown</th>
+              <th>Trades</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="optimizeTableBody">
+            <!-- Populated via JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <footer class="app-footer">
+    <p>MacroSignal Pro Dashboard &copy; 2026. Made with Google Gemini. Professional Educational Prototype.</p>
+  </footer>
 
   <script src="app.js"></script>
 </body>

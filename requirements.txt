@@ -1,2 +1,7 @@
 pandas
 pytest
+yfinance
+fastapi
+uvicorn
+httpx
+
