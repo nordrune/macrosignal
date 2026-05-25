@@ -1,79 +1,70 @@
-# MacroSignal Backtester
+# MacroSignal Pro — Advanced Trading Dashboard & Backtester
 
-MacroSignal is a small command-line backtesting simulator for a university
-software engineering MVP. It reads historical close prices from a CSV file,
-applies one simple moving average strategy, simulates virtual trades, and
-prints a final performance summary.
+MacroSignal Pro is an interactive, professional-grade quantitative backtesting simulator and dashboard. It supports live market data retrieval, advanced indicator generation, parameter sweep optimization, and interactive visualizations.
 
-## What This Project Does
+---
 
-- Loads historical price data from a CSV file.
-- Validates that the CSV contains `date` and `close` columns.
-- Sorts price data by date.
-- Calculates a 20-period simple moving average.
-- Buys when the close price is above the moving average.
-- Sells when the close price is below the moving average.
-- Simulates trades using a fixed starting capital of `$10,000`.
-- Applies a `0.1%` transaction fee to each buy or sell.
-- Prints final capital, profit or loss, trade counts, and final holding status.
+## 🚀 Key Features
 
-## What This Project Does Not Do
+### 1. Advanced Strategy Suite
+- **Simple Moving Average (SMA)** & **Exponential Moving Average (EMA)** crossovers.
+- **Relative Strength Index (RSI)** momentum oscillator.
+- **MACD (Moving Average Convergence Divergence)** signal line crossovers.
+- **Bollinger Bands** mean reversion bounds.
+- **Combined SMA + RSI Master Strategy**: Uses moving average trends filtered by RSI thresholds to reduce false signal breakouts.
 
-This is not a real trading bot. It does not connect to exchanges, use API keys,
-place live orders, stream live market data, manage real money, use cloud
-services, or implement advanced risk management.
+### 2. Dual Data Sources
+- **Live Market Data**: Integrates directly with the Yahoo Finance API (`yfinance`) to fetch historical data for custom tickers (e.g., `AAPL`, `BTC-USD`, `TSLA`).
+- **Custom CSV Uploads**: Supports local CSV imports with date and close column mapping.
 
-## Installation
+### 3. Quantitative Optimizer & Analytics
+- **Parameter Sweep Optimizer**: Serverseitiger Grid-Search-Algorithmus zur automatischen Ermittlung der profitabelsten Parameter-Einstellungen.
+- **Advanced Financial Metrics**: Sharpe Ratio, Maximum Drawdown (DD%), Win Rate, and Buy & Hold comparison returns.
+- **Trade Detail Inspector**: Interactive analysis of individual trades (holding duration, trade net profit, individual trade ROI, and commission fee tracking).
 
-Create a virtual environment if desired, then install the lightweight
-dependencies:
+### 4. High-Fidelity UI Dashboard
+- Responsive neon-dark theme with real-time synchronized canvas charting.
+- Adjustable parameters, auto-run toggles, and live interactive chart hover tooltips.
 
+---
+
+## 🛠️ Installation & Setup
+
+1. **Clone & Navigate**:
+   ```bash
+   cd macrosignal
+   ```
+
+2. **Setup Environment & Dependencies**:
+   ```bash
+   python -m venv .venv
+   .venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
+
+---
+
+## ⚙️ Running the Application
+
+### 1. Web Dashboard Server (Recommended)
+To launch the FastAPI backend server and serve the interactive web interface, run:
 ```bash
-pip install -r requirements.txt
+python -m trading_backtester.main --server
+```
+Once started, open [http://127.0.0.1:8000/](http://127.0.0.1:8000/) in your browser.
+
+### 2. Command Line Interface (CLI)
+You can still run simple backtests on custom CSV files directly in the terminal:
+```bash
+python -m trading_backtester.main data/sample_prices.csv
 ```
 
-## Running the Backtest
+---
 
-From the project root, run:
+## 🧪 Testing
 
-```bash
-python main.py data/sample_prices.csv
-```
-
-The output includes:
-
-- Start capital
-- End capital
-- Profit or loss in dollars
-- Profit or loss in percent
-- Number of buy trades
-- Number of sell trades
-- Final status
-
-## Using the Frontend
-
-Open `frontend/index.html` in a browser. The page runs fully in the browser and
-does not require a web server. You can paste CSV data, upload a CSV file, or load
-the included sample data, then run the moving average backtest visually. The
-frontend also supports adjustable starting capital, moving average window, and
-transaction fee values for interactive scenario testing.
-
-## Running Tests
-
+Execute the automated test suite using `pytest`:
 ```bash
 pytest
 ```
-
-## Expected CSV Format
-
-The input CSV must contain at least these columns:
-
-```csv
-date,close
-2024-01-01,100.00
-2024-01-02,101.50
-2024-01-03,99.75
-```
-
-Rows with invalid dates, missing close prices, or non-positive close prices are
-skipped. If no valid rows remain, the program exits with a clear error message.
+All unit tests verify strategy signal logic, optimizer calculations, metric performance correctness, and API endpoint routing.
