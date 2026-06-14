@@ -1,8 +1,16 @@
-"""Virtual trade simulation for multiple trading strategies."""
+"""Backtesting logic for rule-based trading strategies.
+
+The module keeps the simulation deliberately simple: one asset, one position,
+all-in buys, all-out sells, and a fixed transaction fee. That makes the result
+easy to explain in the dashboard and predictable for unit tests.
+"""
+
+import itertools
+from datetime import time
 
 import pandas as pd
 
-from trading_backtester.models import BacktestResult, Signal
+from trading_backtester.models import BacktestResult, StrategyType
 from trading_backtester.strategy import (
     DEFAULT_MOVING_AVERAGE_WINDOW,
     generate_strategy_signals,
@@ -13,12 +21,97 @@ STARTING_CAPITAL = 10_000.0
 TRANSACTION_FEE_RATE = 0.001
 
 
+def _strategy_value(strategy_type: str | StrategyType) -> str:
+    """Return a normalised strategy key accepted by the signal generator."""
+    if isinstance(strategy_type, StrategyType):
+        return strategy_type.value
+    return str(strategy_type).strip().lower()
+
+
+def _format_date(value: object) -> str:
+    """Use compact dates for daily data and timestamps for intraday data."""
+    if isinstance(value, pd.Timestamp):
+        if value.time() == time(0, 0):
+            return value.strftime("%Y-%m-%d")
+        return value.strftime("%Y-%m-%d %H:%M:%S")
+    return str(value)
+
+
+def _serialise_strategy_data(strategy_data: pd.DataFrame) -> list[dict[str, object]]:
+    """Convert pandas rows to JSON-friendly records for the API and frontend."""
+    records: list[dict[str, object]] = []
+    for _, row in strategy_data.iterrows():
+        record: dict[str, object] = {}
+        for key, value in row.items():
+            if key == "date":
+                record[key] = _format_date(value)
+            elif pd.isna(value):
+                record[key] = None
+            elif hasattr(value, "item"):
+                record[key] = value.item()
+            else:
+                record[key] = value
+        records.append(record)
+    return records
+
+
+def _parameter_grid(strategy_type: str) -> list[dict[str, int | float]]:
+    """Return the finite parameter grid used by the optimizer for one strategy."""
+    if strategy_type in {StrategyType.SMA.value, StrategyType.EMA.value}:
+        return [{"window": window} for window in range(5, 101, 5)]
+
+    if strategy_type == StrategyType.RSI.value:
+        return [
+            {"window": window, "buy_threshold": buy, "sell_threshold": sell}
+            for window, buy, sell in itertools.product(
+                [10, 14, 20],
+                [25, 30, 35],
+                [65, 70, 75],
+            )
+        ]
+
+    if strategy_type == StrategyType.MACD.value:
+        return [
+            {"fast": fast, "slow": slow, "signal_window": signal_window}
+            for fast, slow, signal_window in itertools.product(
+                [8, 12, 16],
+                [20, 26, 32],
+                [7, 9, 11],
+            )
+            if fast < slow
+        ]
+
+    if strategy_type == StrategyType.BOLLINGER.value:
+        return [
+            {"window": window, "num_std": num_std}
+            for window, num_std in itertools.product([10, 20, 30, 40], [1.5, 2.0, 2.5])
+        ]
+
+    if strategy_type == StrategyType.COMBINED.value:
+        return [
+            {
+                "sma_window": sma_window,
+                "rsi_window": rsi_window,
+                "buy_threshold": buy,
+                "sell_threshold": sell,
+            }
+            for sma_window, rsi_window, buy, sell in itertools.product(
+                [10, 20, 30],
+                [10, 14],
+                [40, 50],
+                [65, 70, 75],
+            )
+        ]
+
+    raise ValueError(f"Cannot optimize unknown strategy: {strategy_type}")
+
+
 def run_backtest(
     price_data: pd.DataFrame,
     starting_capital: float = STARTING_CAPITAL,
     transaction_fee_rate: float = TRANSACTION_FEE_RATE,
     moving_average_window: int = DEFAULT_MOVING_AVERAGE_WINDOW,
-    strategy_type: str = "sma",
+    strategy_type: str | StrategyType = StrategyType.SMA,
     **strategy_kwargs,
 ) -> BacktestResult:
     """Run a backtest on historical price data with the chosen strategy.
@@ -32,7 +125,7 @@ def run_backtest(
         starting_capital: Initial virtual cash balance.
         transaction_fee_rate: Fee rate applied to each buy or sell transaction.
         moving_average_window: Window used by the moving average strategy (fallback).
-        strategy_type: The strategy to run ("sma", "ema", "rsi", "macd", "bollinger").
+        strategy_type: Strategy to run.
         **strategy_kwargs: Arguments passed to the strategy signals generator.
 
     Returns:
@@ -45,13 +138,13 @@ def run_backtest(
     if transaction_fee_rate < 0:
         raise ValueError("Transaction fee rate cannot be negative.")
 
-    # Backward compatibility for moving_average_window parameter
-    if strategy_type == "sma" and "window" not in strategy_kwargs:
+    strategy_key = _strategy_value(strategy_type)
+    if strategy_key == StrategyType.SMA.value and "window" not in strategy_kwargs:
         strategy_kwargs["window"] = moving_average_window
 
     strategy_data = generate_strategy_signals(
         price_data,
-        strategy_type=strategy_type,
+        strategy_type=strategy_key,
         **strategy_kwargs,
     )
 
@@ -68,13 +161,8 @@ def run_backtest(
     for row in strategy_data.itertuples(index=False):
         close_price = float(row.close)
 
-        # Safe date conversion
-        if isinstance(row.date, pd.Timestamp):
-            date_str = row.date.strftime("%Y-%m-%d")
-        else:
-            date_str = str(row.date)
+        date_str = _format_date(row.date)
 
-        # Check signals
         if row.signal == "buy" and asset_units == 0:
             cash_before_buy = cash_balance
             fee = cash_balance * transaction_fee_rate
@@ -83,14 +171,16 @@ def run_backtest(
             cash_balance = 0.0
             buy_trades += 1
 
-            trades_log.append({
-                "date": date_str,
-                "type": "buy",
-                "price": close_price,
-                "units": asset_units,
-                "fee": fee,
-                "cashBalance": cash_balance,
-            })
+            trades_log.append(
+                {
+                    "date": date_str,
+                    "type": "buy",
+                    "price": close_price,
+                    "units": asset_units,
+                    "fee": fee,
+                    "cashBalance": cash_balance,
+                }
+            )
         elif row.signal == "sell" and asset_units > 0:
             gross_sale_value = asset_units * close_price
             fee = gross_sale_value * transaction_fee_rate
@@ -102,27 +192,29 @@ def run_backtest(
             profit = cash_balance - cash_before_buy
             trade_profits.append(profit)
 
-            trades_log.append({
-                "date": date_str,
-                "type": "sell",
-                "price": close_price,
-                "units": sold_units,
-                "fee": fee,
-                "cashBalance": cash_balance,
-            })
+            trades_log.append(
+                {
+                    "date": date_str,
+                    "type": "sell",
+                    "price": close_price,
+                    "units": sold_units,
+                    "fee": fee,
+                    "cashBalance": cash_balance,
+                }
+            )
 
-        # Calculate daily portfolio value
         current_portfolio_value = cash_balance + (asset_units * close_price)
-        daily_portfolio_values.append({
-            "date": date_str,
-            "capital": current_portfolio_value,
-        })
+        daily_portfolio_values.append(
+            {
+                "date": date_str,
+                "capital": current_portfolio_value,
+            }
+        )
 
     last_close_price = float(price_data.iloc[-1]["close"])
     if asset_units > 0:
         end_capital = asset_units * last_close_price
         final_status = "holding asset"
-        # Track open trade profit
         profit = end_capital - cash_before_buy
         trade_profits.append(profit)
     else:
@@ -132,7 +224,6 @@ def run_backtest(
     profit_loss = end_capital - starting_capital
     profit_loss_percent = (profit_loss / starting_capital) * 100
 
-    # Calculate financial risk metrics
     cap_series = pd.Series([item["capital"] for item in daily_portfolio_values])
     daily_returns = cap_series.pct_change().dropna()
     if len(daily_returns) > 1 and daily_returns.std() > 0:
@@ -151,21 +242,6 @@ def run_backtest(
     first_close_price = float(price_data.iloc[0]["close"])
     buy_and_hold_return = ((last_close_price - first_close_price) / first_close_price) * 100
 
-    # Convert strategy_data columns into serializable timeseries dict list
-    series_data = []
-    for idx, row in strategy_data.iterrows():
-        row_dict = row.to_dict()
-        if isinstance(row_dict.get("date"), (pd.Timestamp, pd.DatetimeTZDtype)):
-            row_dict["date"] = row_dict["date"].strftime("%Y-%m-%d")
-        else:
-            row_dict["date"] = str(row_dict["date"])
-
-        # Convert NaNs to None for clean JSON serialization
-        for key, val in row_dict.items():
-            if pd.isna(val):
-                row_dict[key] = None
-        series_data.append(row_dict)
-
     return BacktestResult(
         start_capital=starting_capital,
         end_capital=end_capital,
@@ -179,7 +255,7 @@ def run_backtest(
         win_rate=win_rate,
         buy_and_hold_return=buy_and_hold_return,
         capital_history=daily_portfolio_values,
-        series_data=series_data,
+        series_data=_serialise_strategy_data(strategy_data),
         trades=trades_log,
     )
 
@@ -207,63 +283,27 @@ def optimize_strategy_parameters(
     price_data: pd.DataFrame,
     starting_capital: float = STARTING_CAPITAL,
     transaction_fee_rate: float = TRANSACTION_FEE_RATE,
-    strategy_type: str = "sma",
+    strategy_type: str | StrategyType = StrategyType.SMA,
 ) -> list[dict]:
-    """Perform a grid search sweep over strategy parameters to identify the top performing configurations."""
-    import itertools
+    """Return the top five parameter combinations for the selected strategy.
 
+    The optimizer is a deterministic grid search. It is intentionally limited
+    to small grids so that students can understand the search space and the
+    dashboard can respond quickly on typical local machines.
+    """
+    strategy_key = _strategy_value(strategy_type)
     runs = []
 
-    if strategy_type == "sma":
-        grid = [{"window": w} for w in range(5, 101, 5)]
-    elif strategy_type == "ema":
-        grid = [{"window": w} for w in range(5, 101, 5)]
-    elif strategy_type == "rsi":
-        windows = [10, 14, 20]
-        buys = [25, 30, 35]
-        sells = [65, 70, 75]
-        grid = [
-            {"window": w, "buy_threshold": b, "sell_threshold": s}
-            for w, b, s in itertools.product(windows, buys, sells)
-        ]
-    elif strategy_type == "macd":
-        fasts = [8, 12, 16]
-        slows = [20, 26, 32]
-        signals = [7, 9, 11]
-        grid = [
-            {"fast": f, "slow": s, "signal_window": sig}
-            for f, s, sig in itertools.product(fasts, slows, signals)
-            if f < s
-        ]
-    elif strategy_type == "bollinger":
-        windows = [10, 20, 30, 40]
-        stds = [1.5, 2.0, 2.5]
-        grid = [
-            {"window": w, "num_std": std}
-            for w, std in itertools.product(windows, stds)
-        ]
-    elif strategy_type == "combined":
-        sma_wins = [10, 20, 30]
-        rsi_wins = [10, 14]
-        buys = [40, 50]
-        sells = [65, 70, 75]
-        grid = [
-            {"sma_window": sw, "rsi_window": rw, "buy_threshold": b, "sell_threshold": s}
-            for sw, rw, b, s in itertools.product(sma_wins, rsi_wins, buys, sells)
-        ]
-    else:
-        raise ValueError(f"Cannot optimize unknown strategy: {strategy_type}")
-
-    for params in grid:
-        try:
-            res = run_backtest(
-                price_data=price_data,
-                starting_capital=starting_capital,
-                transaction_fee_rate=transaction_fee_rate,
-                strategy_type=strategy_type,
-                **params,
-            )
-            runs.append({
+    for params in _parameter_grid(strategy_key):
+        res = run_backtest(
+            price_data=price_data,
+            starting_capital=starting_capital,
+            transaction_fee_rate=transaction_fee_rate,
+            strategy_type=strategy_key,
+            **params,
+        )
+        runs.append(
+            {
                 "params": params,
                 "end_capital": float(res.end_capital),
                 "profit_loss": float(res.profit_loss),
@@ -272,11 +312,9 @@ def optimize_strategy_parameters(
                 "max_drawdown": float(res.max_drawdown),
                 "win_rate": float(res.win_rate),
                 "total_trades": int(res.buy_trades + res.sell_trades),
-            })
-        except Exception:
-            continue
+            }
+        )
 
-    # Sort descending by strategy return, break ties with Sharpe Ratio
     runs.sort(key=lambda r: (r["profit_loss_percent"], r["sharpe_ratio"]), reverse=True)
     return runs[:5]
 

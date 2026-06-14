@@ -1,11 +1,16 @@
-"""Shared data models for the trading backtester."""
+"""Shared data models for MacroSignal.
+
+These models are intentionally small and framework-independent so they can be
+used by the CLI, FastAPI routes, tests, and future interfaces without creating
+API-specific dependencies.
+"""
 
 from dataclasses import dataclass
 from enum import Enum
 
 
 class Signal(str, Enum):
-    """Possible trading signals produced by the moving average strategy."""
+    """Trading actions produced by a strategy."""
 
     BUY = "buy"
     SELL = "sell"
@@ -20,11 +25,17 @@ class StrategyType(str, Enum):
     RSI = "rsi"
     MACD = "macd"
     BOLLINGER = "bollinger"
+    COMBINED = "combined"
 
 
 @dataclass(frozen=True)
 class BacktestResult:
-    """Final performance summary produced by a completed backtest."""
+    """Complete result returned after a backtest run.
+
+    The scalar fields describe the final performance. The list fields are
+    serialisable records used by the dashboard for charts, trade tables, and
+    point-by-point inspection.
+    """
 
     start_capital: float
     end_capital: float
@@ -37,9 +48,9 @@ class BacktestResult:
     max_drawdown: float
     win_rate: float
     buy_and_hold_return: float
-    capital_history: list[dict]
-    series_data: list[dict]
-    trades: list[dict]
+    capital_history: list[dict[str, object]]
+    series_data: list[dict[str, object]]
+    trades: list[dict[str, object]]
 
 
 

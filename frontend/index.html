@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MacroSignal Pro - Advanced Trading Bot & Backtester</title>
+  <title>MacroSignal - Strategie-Tester</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -12,37 +12,46 @@
 <body>
   <header class="app-header">
     <div class="header-logo">
-      <p class="eyebrow">University Software Engineering MVP</p>
-      <h1>MacroSignal <span>Pro</span></h1>
+      <p class="eyebrow" data-i18n="header.eyebrow">Software Engineering Projekt</p>
+      <h1>MacroSignal <span data-i18n="header.productSuffix">Strategie-Tester</span></h1>
     </div>
-    <div class="active-config" aria-label="Current strategy configurations">
-      <span id="activeStrategy">Strategy: SMA</span>
-      <span id="activeTicker">Ticker: AAPL</span>
-      <span id="activeFee">Fee: 0.1%</span>
+    <div class="header-actions">
+      <div class="active-config" data-i18n-aria-label="active.settings" aria-label="Aktuelle Einstellungen">
+        <span id="activeStrategy">Strategie: SMA</span>
+        <span id="activeTicker">Ticker: BTC-USD</span>
+        <span id="activeFee">Gebühr: 0.1%</span>
+      </div>
+      <div class="language-switch" data-i18n-aria-label="language.aria" aria-label="Sprache wechseln">
+        <button class="lang-btn active" type="button" data-language-option="de" aria-pressed="true">DE</button>
+        <button class="lang-btn" type="button" data-language-option="en" aria-pressed="false">EN</button>
+      </div>
     </div>
   </header>
 
   <main class="dashboard-grid">
-    <!-- Panel 1: Sidebar Controls -->
     <section class="control-panel" aria-labelledby="controls-title">
-      <h2 id="controls-title" class="section-title">Configuration</h2>
+      <h2 id="controls-title" class="section-title" data-i18n="section.settings">Einstellungen</h2>
 
-      <!-- Toggle Source: API vs CSV -->
       <div class="source-toggle-wrap">
-        <span class="toggle-label">Data Source</span>
+        <span class="toggle-label">
+          <span data-i18n="source.label">Datenquelle</span>
+          <span class="help-tip" tabindex="0" data-i18n-tooltip="source.tooltip" data-tooltip="Hier wählst du, ob echte historische Marktdaten geladen werden oder ob eine eigene CSV-Datei verwendet wird." aria-label="Info">?</span>
+        </span>
         <div class="toggle-buttons">
-          <button id="sourceApiBtn" class="source-btn active" type="button">Yahoo Finance API</button>
-          <button id="sourceCsvBtn" class="source-btn" type="button">Local CSV File</button>
+          <button id="sourceApiBtn" class="source-btn active" type="button" data-i18n="source.yahoo">Yahoo Finance</button>
+          <button id="sourceCsvBtn" class="source-btn" type="button" data-i18n="source.csv">CSV-Datei</button>
         </div>
       </div>
 
-      <!-- Settings Block for API Source -->
       <div id="apiSettings" class="settings-block active">
         <div class="input-group">
-          <label for="tickerInput">Ticker Symbol</label>
+          <label for="tickerInput">
+            <span data-i18n="ticker.label">Ticker-Symbol</span>
+            <span class="help-tip" tabindex="0" data-i18n-tooltip="ticker.tooltip" data-tooltip="Kurzname eines Assets an der Börse. Beispiele: AAPL für Apple, BTC-USD für Bitcoin in US-Dollar." aria-label="Info">?</span>
+          </label>
           <div class="search-wrap">
-            <input id="tickerInput" type="text" placeholder="e.g. AAPL, BTC-USD, EURUSD=X" value="BTC-USD">
-            <button id="fetchDataBtn" type="button">Fetch</button>
+            <input id="tickerInput" type="text" data-i18n-placeholder="ticker.placeholder" placeholder="z. B. AAPL, BTC-USD, EURUSD=X" value="BTC-USD">
+            <button id="fetchDataBtn" type="button" data-i18n="action.loadData">Daten laden</button>
           </div>
           <div class="ticker-suggestions">
             <button class="suggestion-token" data-ticker="BTC-USD" type="button">BTC</button>
@@ -55,144 +64,188 @@
 
         <div class="settings-row-2">
           <div class="input-group">
-            <label for="periodSelect">Period</label>
+            <label for="periodSelect">
+              <span data-i18n="period.label">Zeitraum</span>
+              <span class="help-tip" tabindex="0" data-i18n-tooltip="period.tooltip" data-tooltip="Wie weit die historischen Kursdaten zurückreichen sollen." aria-label="Info">?</span>
+            </label>
             <select id="periodSelect">
-              <option value="1mo">1 Month</option>
-              <option value="3mo">3 Months</option>
-              <option value="6mo">6 Months</option>
-              <option value="1y" selected>1 Year</option>
-              <option value="2y">2 Years</option>
-              <option value="5y">5 Years</option>
-              <option value="max">Max</option>
+              <option value="1mo" data-i18n="period.1mo">1 Monat</option>
+              <option value="3mo" data-i18n="period.3mo">3 Monate</option>
+              <option value="6mo" data-i18n="period.6mo">6 Monate</option>
+              <option value="1y" selected data-i18n="period.1y">1 Jahr</option>
+              <option value="2y" data-i18n="period.2y">2 Jahre</option>
+              <option value="5y" data-i18n="period.5y">5 Jahre</option>
+              <option value="max" data-i18n="period.max">Maximal</option>
             </select>
           </div>
           <div class="input-group">
-            <label for="intervalSelect">Interval</label>
+            <label for="intervalSelect">
+              <span data-i18n="interval.label">Datenabstand</span>
+              <span class="help-tip" tabindex="0" data-i18n-tooltip="interval.tooltip" data-tooltip="Legt fest, ob jeder Kurswert z. B. eine Stunde, einen Tag oder eine Woche abbildet." aria-label="Info">?</span>
+            </label>
             <select id="intervalSelect">
-              <option value="1h">1 Hour</option>
-              <option value="1d" selected>1 Day</option>
-              <option value="1wk">1 Week</option>
+              <option value="1h" data-i18n="interval.1h">1 Stunde</option>
+              <option value="1d" selected data-i18n="interval.1d">1 Tag</option>
+              <option value="1wk" data-i18n="interval.1wk">1 Woche</option>
             </select>
           </div>
         </div>
       </div>
 
-      <!-- Settings Block for CSV Source -->
       <div id="csvSettings" class="settings-block">
         <div class="panel-heading-inline">
-          <span class="subtitle">Upload or paste csv data (cols: date, close)</span>
+          <span class="subtitle">
+            <span data-i18n="csv.heading">CSV hochladen oder einfügen (Spalten: date, close)</span>
+            <span class="help-tip" tabindex="0" data-i18n-tooltip="csv.tooltip" data-tooltip="CSV ist eine einfache Tabellen-Datei. Diese App braucht mindestens Datum und Schlusskurs." aria-label="Info">?</span>
+          </span>
           <label class="file-control">
             <input id="csvFile" type="file" accept=".csv,text/csv">
-            Upload CSV
+            <span data-i18n="csv.upload">CSV hochladen</span>
           </label>
         </div>
         <div id="dropZone" class="drop-zone">
-          <span>Drag & Drop CSV file here or edit below</span>
+          <span data-i18n="csv.drop">CSV-Datei hier ablegen oder unten einfügen</span>
         </div>
-        <textarea id="csvText" spellcheck="false" placeholder="date,close&#10;2024-01-01,100.00&#10;2024-01-02,101.50" aria-label="CSV data"></textarea>
+        <textarea id="csvText" spellcheck="false" placeholder="date,close&#10;2024-01-01,100.00&#10;2024-01-02,101.50" data-i18n-aria-label="csv.aria" aria-label="CSV-Daten"></textarea>
       </div>
 
-      <!-- Strategy Selection -->
       <div class="input-group">
-        <label for="strategySelect">Trading Strategy</label>
+        <label for="strategySelect">
+          <span data-i18n="strategy.label">Strategie</span>
+          <span class="help-tip" tabindex="0" data-i18n-tooltip="strategy.tooltip" data-tooltip="Eine Regel, nach der die App rückwirkend entscheidet: kaufen, verkaufen oder halten. SMA/EMA sind Durchschnittslinien, RSI misst Stärke/Schwäche, MACD sucht Trendwechsel." aria-label="Info">?</span>
+        </label>
         <select id="strategySelect">
-          <option value="sma" selected>Simple Moving Average (SMA) Crossover</option>
-          <option value="ema">Exponential Moving Average (EMA) Crossover</option>
-          <option value="rsi">Relative Strength Index (RSI)</option>
-          <option value="macd">MACD Crossover</option>
-          <option value="bollinger">Bollinger Bands Mean Reversion</option>
-          <option value="combined">Combined SMA + RSI Master Strategy</option>
+          <option value="sma" selected data-i18n="strategy.sma">Einfacher Durchschnitt (SMA)</option>
+          <option value="ema" data-i18n="strategy.ema">Gewichteter Durchschnitt (EMA)</option>
+          <option value="rsi" data-i18n="strategy.rsi">Überkauft/überverkauft (RSI)</option>
+          <option value="macd" data-i18n="strategy.macd">Trendwechsel (MACD)</option>
+          <option value="bollinger" data-i18n="strategy.bollinger">Preisspanne (Bollinger Bands)</option>
+          <option value="combined" data-i18n="strategy.combined">SMA + RSI kombiniert</option>
         </select>
       </div>
 
-      <!-- Dynamic Strategy Parameter Blocks -->
       <div id="strategyParamsContainer" class="strategy-params-panel">
-        
-        <!-- SMA Params -->
         <div id="params_sma" class="param-group active">
           <div class="input-group">
-            <label for="sma_window">SMA Window (Periods)</label>
+            <label for="sma_window">
+              <span data-i18n="param.smaWindow">SMA-Zeitraum</span>
+              <span class="help-tip" tabindex="0" data-i18n-tooltip="param.smaTooltip" data-tooltip="SMA bedeutet Simple Moving Average: der einfache Durchschnitt der letzten X Kurswerte." aria-label="Info">?</span>
+            </label>
             <input id="sma_window" type="number" min="1" step="1" value="20">
           </div>
         </div>
 
-        <!-- EMA Params -->
         <div id="params_ema" class="param-group">
           <div class="input-group">
-            <label for="ema_window">EMA Window (Periods)</label>
+            <label for="ema_window">
+              <span data-i18n="param.emaWindow">EMA-Zeitraum</span>
+              <span class="help-tip" tabindex="0" data-i18n-tooltip="param.emaTooltip" data-tooltip="EMA ist ein Durchschnitt, der neue Kurse stärker gewichtet als ältere Kurse." aria-label="Info">?</span>
+            </label>
             <input id="ema_window" type="number" min="1" step="1" value="20">
           </div>
         </div>
 
-        <!-- RSI Params -->
         <div id="params_rsi" class="param-group">
           <div class="settings-row-3">
             <div class="input-group">
-              <label for="rsi_window">RSI Period</label>
+              <label for="rsi_window">
+                <span data-i18n="param.rsiWindow">RSI-Zeitraum</span>
+                <span class="help-tip" tabindex="0" data-i18n-tooltip="param.rsiTooltip" data-tooltip="RSI misst, ob ein Asset zuletzt eher stark gestiegen oder gefallen ist. Werte nahe 0 sind schwach, Werte nahe 100 sehr stark." aria-label="Info">?</span>
+              </label>
               <input id="rsi_window" type="number" min="1" step="1" value="14">
             </div>
             <div class="input-group">
-              <label for="rsi_buy">Buy Threshold (Oversold)</label>
+              <label for="rsi_buy">
+                <span data-i18n="param.buyThreshold">Kauf-Schwelle</span>
+                <span class="help-tip" tabindex="0" data-i18n-tooltip="param.buyThresholdTooltip" data-tooltip="Unter diesem RSI-Wert gilt das Asset als eher überverkauft. Die Strategie kann dann ein Kaufsignal erzeugen." aria-label="Info">?</span>
+              </label>
               <input id="rsi_buy" type="number" min="1" max="99" step="1" value="30">
             </div>
             <div class="input-group">
-              <label for="rsi_sell">Sell Threshold (Overbought)</label>
+              <label for="rsi_sell">
+                <span data-i18n="param.sellThreshold">Verkauf-Schwelle</span>
+                <span class="help-tip" tabindex="0" data-i18n-tooltip="param.sellThresholdTooltip" data-tooltip="Über diesem RSI-Wert gilt das Asset als eher überkauft. Die Strategie kann dann ein Verkaufssignal erzeugen." aria-label="Info">?</span>
+              </label>
               <input id="rsi_sell" type="number" min="1" max="99" step="1" value="70">
             </div>
           </div>
         </div>
 
-        <!-- MACD Params -->
         <div id="params_macd" class="param-group">
           <div class="settings-row-3">
             <div class="input-group">
-              <label for="macd_fast">Fast Period</label>
+              <label for="macd_fast">
+                <span data-i18n="param.fastLine">Schnelle Linie</span>
+                <span class="help-tip" tabindex="0" data-i18n-tooltip="param.fastLineTooltip" data-tooltip="MACD vergleicht zwei Durchschnittslinien. Die schnelle Linie reagiert stärker auf neue Kurse." aria-label="Info">?</span>
+              </label>
               <input id="macd_fast" type="number" min="1" step="1" value="12">
             </div>
             <div class="input-group">
-              <label for="macd_slow">Slow Period</label>
+              <label for="macd_slow">
+                <span data-i18n="param.slowLine">Langsame Linie</span>
+                <span class="help-tip" tabindex="0" data-i18n-tooltip="param.slowLineTooltip" data-tooltip="Die langsame MACD-Linie reagiert träger und dient als Vergleich zur schnellen Linie." aria-label="Info">?</span>
+              </label>
               <input id="macd_slow" type="number" min="1" step="1" value="26">
             </div>
             <div class="input-group">
-              <label for="macd_signal">Signal Period</label>
+              <label for="macd_signal">
+                <span data-i18n="param.signalLine">Signallinie</span>
+                <span class="help-tip" tabindex="0" data-i18n-tooltip="param.signalLineTooltip" data-tooltip="Die Signallinie glättet den MACD. Kreuzungen werden als mögliche Kauf- oder Verkaufspunkte genutzt." aria-label="Info">?</span>
+              </label>
               <input id="macd_signal" type="number" min="1" step="1" value="9">
             </div>
           </div>
         </div>
 
-        <!-- Bollinger Bands Params -->
         <div id="params_bollinger" class="param-group">
           <div class="settings-row-2">
             <div class="input-group">
-              <label for="bb_window">BB Window</label>
+              <label for="bb_window">
+                <span data-i18n="param.bandWindow">Band-Zeitraum</span>
+                <span class="help-tip" tabindex="0" data-i18n-tooltip="param.bandWindowTooltip" data-tooltip="Bollinger Bands zeigen eine obere und untere Preisspanne rund um den Durchschnitt." aria-label="Info">?</span>
+              </label>
               <input id="bb_window" type="number" min="1" step="1" value="20">
             </div>
             <div class="input-group">
-              <label for="bb_std">Std Dev Multiplier</label>
+              <label for="bb_std">
+                <span data-i18n="param.bandWidth">Band-Breite</span>
+                <span class="help-tip" tabindex="0" data-i18n-tooltip="param.bandWidthTooltip" data-tooltip="Bestimmt, wie weit die Bollinger-Bänder vom Durchschnitt entfernt liegen. Größer bedeutet breitere Bänder." aria-label="Info">?</span>
+              </label>
               <input id="bb_std" type="number" min="0.1" step="0.1" value="2.0">
             </div>
           </div>
         </div>
 
-        <!-- Combined Params -->
         <div id="params_combined" class="param-group">
           <div class="settings-row-2">
             <div class="input-group">
-              <label for="comb_sma_window">SMA Filter Window</label>
+              <label for="comb_sma_window">
+                <span data-i18n="param.smaFilter">SMA-Filter</span>
+                <span class="help-tip" tabindex="0" data-i18n-tooltip="param.combinedSmaTooltip" data-tooltip="Die kombinierte Strategie kauft nur, wenn der Kurs zusätzlich zum RSI-Signal zum SMA-Filter passt." aria-label="Info">?</span>
+              </label>
               <input id="comb_sma_window" type="number" min="1" step="1" value="20">
             </div>
             <div class="input-group">
-              <label for="comb_rsi_window">RSI Period</label>
+              <label for="comb_rsi_window">
+                <span data-i18n="param.rsiWindow">RSI-Zeitraum</span>
+                <span class="help-tip" tabindex="0" data-i18n-tooltip="param.combinedRsiTooltip" data-tooltip="Legt fest, wie viele Kurswerte für den RSI-Teil der kombinierten Strategie betrachtet werden." aria-label="Info">?</span>
+              </label>
               <input id="comb_rsi_window" type="number" min="1" step="1" value="14">
             </div>
           </div>
           <div class="settings-row-2">
             <div class="input-group">
-              <label for="comb_rsi_buy">RSI Buy Filter (Oversold)</label>
+              <label for="comb_rsi_buy">
+                <span data-i18n="param.rsiBuyFilter">RSI-Kauffilter</span>
+                <span class="help-tip" tabindex="0" data-i18n-tooltip="param.rsiBuyFilterTooltip" data-tooltip="Unter diesem RSI-Wert darf die kombinierte Strategie ein Kaufsignal prüfen." aria-label="Info">?</span>
+              </label>
               <input id="comb_rsi_buy" type="number" min="1" max="99" step="1" value="50">
             </div>
             <div class="input-group">
-              <label for="comb_rsi_sell">RSI Sell Filter (Overbought)</label>
+              <label for="comb_rsi_sell">
+                <span data-i18n="param.rsiSellFilter">RSI-Verkaufsfilter</span>
+                <span class="help-tip" tabindex="0" data-i18n-tooltip="param.rsiSellFilterTooltip" data-tooltip="Über diesem RSI-Wert darf die kombinierte Strategie ein Verkaufssignal prüfen." aria-label="Info">?</span>
+              </label>
               <input id="comb_rsi_sell" type="number" min="1" max="99" step="1" value="70">
             </div>
           </div>
@@ -200,14 +253,19 @@
 
       </div>
 
-      <!-- General Backtester Params -->
       <div class="settings-row-2">
         <div class="input-group">
-          <label for="startingCapital">Starting Capital</label>
+          <label for="startingCapital">
+            <span data-i18n="capital.start">Startkapital</span>
+            <span class="help-tip" tabindex="0" data-i18n-tooltip="capital.tooltip" data-tooltip="Virtuelles Geld, mit dem die Simulation startet. Es wird kein echtes Geld verwendet." aria-label="Info">?</span>
+          </label>
           <input id="startingCapital" type="number" min="1" step="100" value="10000">
         </div>
         <div class="input-group">
-          <label for="feeRate">Transaction Fee (%)</label>
+          <label for="feeRate">
+            <span data-i18n="fee.label">Gebühr pro Kauf/Verkauf (%)</span>
+            <span class="help-tip" tabindex="0" data-i18n-tooltip="fee.tooltip" data-tooltip="Simulierte Handelsgebühr bei jedem Kauf oder Verkauf. 0.1 bedeutet 0.1 Prozent." aria-label="Info">?</span>
+          </label>
           <input id="feeRate" type="number" min="0" step="0.01" value="0.1">
         </div>
       </div>
@@ -216,164 +274,173 @@
         <label class="toggle-control">
           <input id="autoRun" type="checkbox" checked>
           <span class="custom-checkbox"></span>
-          <span>Auto-run on changes</span>
+          <span data-i18n="autorun.label">Bei Änderungen automatisch neu berechnen</span>
         </label>
       </div>
 
       <div class="action-row">
-        <button id="runButton" class="primary-btn" type="button">Run Backtest</button>
-        <button id="optimizeBtn" class="accent-btn" type="button">Optimize Params</button>
-        <button id="loadSampleBtn" class="secondary-btn" type="button">Load CSV Sample</button>
+        <button id="runButton" class="primary-btn" type="button" data-i18n="action.run">Strategie testen</button>
+        <button id="optimizeBtn" class="accent-btn" type="button" data-i18n="action.optimize">Parameter suchen</button>
+        <button id="loadSampleBtn" class="secondary-btn" type="button" data-i18n="action.sample">Beispieldaten laden</button>
       </div>
 
       <div id="statusMessage" class="status-msg" role="status" aria-live="polite"></div>
     </section>
 
-    <!-- Panel 2: Performance Results & Visual Charts -->
     <section class="results-panel" aria-labelledby="results-title">
       <div class="panel-header-inline">
-        <h2 id="results-title" class="section-title">Backtest Results</h2>
-        <span id="dataSummary" class="data-summary">No run yet</span>
+        <h2 id="results-title" class="section-title" data-i18n="results.title">Ergebnis der Simulation</h2>
+        <span id="dataSummary" class="data-summary" data-i18n="results.empty">Noch nicht berechnet</span>
       </div>
 
-      <!-- Metrics Grid (Advanced Financial/Risk metrics) -->
-      <div class="metrics-grid" aria-label="Performance metrics">
+      <div class="metrics-grid" data-i18n-aria-label="metrics.aria" aria-label="Kennzahlen der Simulation">
         <article class="metric-card">
-          <span class="card-label">Start Capital</span>
+          <span class="card-label" data-i18n="metric.start">Startkapital</span>
           <strong id="startCapital">$0.00</strong>
         </article>
         <article class="metric-card">
-          <span class="card-label">End Capital</span>
+          <span class="card-label" data-i18n="metric.end">Endkapital</span>
           <strong id="endCapital">$0.00</strong>
         </article>
         <article class="metric-card">
-          <span class="card-label">Net Profit / Loss</span>
+          <span class="card-label" data-i18n="metric.profit">Gewinn / Verlust</span>
           <strong id="profitLoss">$0.00</strong>
         </article>
         <article class="metric-card">
-          <span class="card-label">Strategy Return</span>
+          <span class="card-label">
+            <span data-i18n="metric.strategyReturn">Strategie-Rendite</span>
+            <span class="help-tip" tabindex="0" data-i18n-tooltip="metric.strategyReturnTooltip" data-tooltip="Prozentuale Veränderung des Startkapitals durch die getestete Strategie." aria-label="Info">?</span>
+          </span>
           <strong id="profitLossPercent">0.00%</strong>
         </article>
         <article class="metric-card">
-          <span class="card-label">Sharpe Ratio</span>
+          <span class="card-label">
+            <span data-i18n="metric.sharpe">Sharpe Ratio</span>
+            <span class="help-tip" tabindex="0" data-i18n-tooltip="metric.sharpeTooltip" data-tooltip="Kennzahl für Rendite im Verhältnis zum Risiko. Höher ist besser, aber für diesen MVP nur eine grobe Orientierung." aria-label="Info">?</span>
+          </span>
           <strong id="sharpeRatio">0.00</strong>
         </article>
         <article class="metric-card">
-          <span class="card-label">Max Drawdown</span>
+          <span class="card-label">
+            <span data-i18n="metric.drawdown">Größter Rückgang</span>
+            <span class="help-tip" tabindex="0" data-i18n-tooltip="metric.drawdownTooltip" data-tooltip="Der größte zwischenzeitliche Verlust vom bisherigen Höchststand des virtuellen Kapitals." aria-label="Info">?</span>
+          </span>
           <strong id="maxDrawdown">0.00%</strong>
         </article>
         <article class="metric-card">
-          <span class="card-label">Win Rate</span>
+          <span class="card-label">
+            <span data-i18n="metric.winRate">Trefferquote</span>
+            <span class="help-tip" tabindex="0" data-i18n-tooltip="metric.winRateTooltip" data-tooltip="Anteil der abgeschlossenen Trades, die mit Gewinn endeten." aria-label="Info">?</span>
+          </span>
           <strong id="winRate">0.00%</strong>
         </article>
         <article class="metric-card">
-          <span class="card-label">Buy & Hold Return</span>
+          <span class="card-label">
+            <span data-i18n="metric.buyHold">Kaufen und Halten</span>
+            <span class="help-tip" tabindex="0" data-i18n-tooltip="metric.buyHoldTooltip" data-tooltip="Vergleich: Was passiert wäre, wenn man am Anfang gekauft und bis zum Ende gehalten hätte." aria-label="Info">?</span>
+          </span>
           <strong id="buyAndHoldReturn">0.00%</strong>
         </article>
         <article class="metric-card">
-          <span class="card-label">Trades (Buy/Sell)</span>
+          <span class="card-label" data-i18n="metric.trades">Aktionen (Kauf/Verkauf)</span>
           <strong id="tradeCount">0 (0 / 0)</strong>
         </article>
       </div>
 
       <div class="status-ribbon">
-        <span class="status-label">Current Position Status</span>
-        <strong id="finalStatus" class="status-value">holding cash</strong>
+        <span class="status-label" data-i18n="status.position">Aktueller Simulationsstatus</span>
+        <strong id="finalStatus" class="status-value" data-i18n="position.cash">hält Bargeld</strong>
       </div>
 
-      <!-- Double Panel Chart Container -->
       <div class="double-chart-container">
-        <!-- Main Price Chart Panel -->
-        <div class="chart-wrapper main-chart" aria-label="Asset Price and Strategy Indicators Chart">
+        <div class="chart-wrapper main-chart" data-i18n-aria-label="chart.mainAria" aria-label="Kursverlauf und Strategie-Indikatoren">
           <canvas id="priceChart"></canvas>
           <div id="chartTooltip" class="chart-tooltip" hidden></div>
         </div>
         
-        <!-- Sub Indicator Chart Panel (RSI, MACD, Drawdown) -->
-        <div class="chart-wrapper sub-chart" aria-label="Sub-Indicator Panel">
+        <div class="chart-wrapper sub-chart" data-i18n-aria-label="chart.subAria" aria-label="Zusätzlicher Indikator">
           <canvas id="indicatorChart"></canvas>
         </div>
       </div>
 
-      <!-- Chart Legend -->
-      <div class="legend-row" aria-label="Chart legends">
-        <span><i class="legend-line close-line"></i>Price</span>
-        <span id="maLegend"><i class="legend-line indicator-line"></i>Indicator</span>
-        <span id="bbUpperLegend" hidden><i class="legend-line bb-upper-line"></i>BB Upper</span>
-        <span id="bbLowerLegend" hidden><i class="legend-line bb-lower-line"></i>BB Lower</span>
-        <span><i class="legend-dot buy-dot"></i>Buy Sign</span>
-        <span><i class="legend-dot sell-dot"></i>Sell Sign</span>
+      <div class="legend-row" data-i18n-aria-label="legend.aria" aria-label="Chart-Legende">
+        <span><i class="legend-line close-line"></i><span data-i18n="legend.price">Kurs</span></span>
+        <span id="maLegend"><i class="legend-line indicator-line"></i><span data-i18n="legend.indicator">Indikator</span></span>
+        <span id="bbUpperLegend" hidden><i class="legend-line bb-upper-line"></i><span data-i18n="legend.upperBand">Oberes Band</span></span>
+        <span id="bbLowerLegend" hidden><i class="legend-line bb-lower-line"></i><span data-i18n="legend.lowerBand">Unteres Band</span></span>
+        <span><i class="legend-dot buy-dot"></i><span data-i18n="legend.buy">Kaufsignal</span></span>
+        <span><i class="legend-dot sell-dot"></i><span data-i18n="legend.sell">Verkaufssignal</span></span>
       </div>
 
-      <!-- Point Inspector -->
-      <div class="point-inspector" aria-label="Point information">
+      <div class="point-inspector" data-i18n-aria-label="inspect.aria" aria-label="Information zum ausgewählten Chartpunkt">
         <div class="inspect-cell">
-          <span class="inspect-label">Selected Date</span>
-          <strong id="selectedDate">Hover over chart</strong>
+          <span class="inspect-label" data-i18n="inspect.date">Ausgewähltes Datum</span>
+          <strong id="selectedDate" data-i18n="inspect.defaultDate">Über den Chart fahren</strong>
         </div>
         <div class="inspect-cell">
-          <span class="inspect-label">Close Price</span>
+          <span class="inspect-label" data-i18n="inspect.close">Schlusskurs</span>
           <strong id="selectedClose">-</strong>
         </div>
         <div class="inspect-cell">
-          <span class="inspect-label">Indicator Value</span>
+          <span class="inspect-label" data-i18n="inspect.indicator">Indikatorwert</span>
           <strong id="selectedAverage">-</strong>
         </div>
         <div class="inspect-cell">
-          <span class="inspect-label">Signal Generated</span>
+          <span class="inspect-label" data-i18n="inspect.signal">Signal</span>
           <strong id="selectedSignal">-</strong>
         </div>
       </div>
     </section>
 
-    <!-- Panel 3: Trade Log Log Table -->
     <section class="table-panel" aria-labelledby="trades-title">
       <div class="panel-header-inline">
-        <h2 id="trades-title" class="section-title">Trade Log</h2>
-        <span class="subtitle">Virtual simulated order history</span>
+        <h2 id="trades-title" class="section-title" data-i18n="trades.title">Simulierte Käufe und Verkäufe</h2>
+        <span class="subtitle" data-i18n="trades.subtitle">Virtuelle Käufe und Verkäufe der Strategie</span>
       </div>
 
       <div class="table-scroll-container">
         <table class="trade-log-table">
           <thead>
             <tr>
-              <th>Timestamp</th>
-              <th>Transaction</th>
-              <th>Execution Price</th>
-              <th>Shares / Units</th>
-              <th>Fee Paid</th>
-              <th>Equity Cash Balance</th>
+              <th data-i18n="table.date">Datum</th>
+              <th data-i18n="table.action">Aktion</th>
+              <th data-i18n="table.price">Kurs</th>
+              <th data-i18n="table.units">Anzahl</th>
+              <th data-i18n="table.fee">Gebühr</th>
+              <th data-i18n="table.cash">Bargeld danach</th>
             </tr>
           </thead>
           <tbody id="tradeTableBody">
             <tr>
-              <td colspan="6" class="empty-table-msg">Run backtest to populate trade log.</td>
+              <td colspan="6" class="empty-table-msg" data-i18n="table.empty">Strategie testen, um simulierte Trades zu sehen.</td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <!-- Trade Detail Inspector Panel -->
       <div id="tradeInspectorPanel" class="trade-inspector-panel" hidden>
         <div class="inspector-header">
-          <h3 class="inspector-title">Trade Detail Inspector</h3>
-          <button id="closeInspectorBtn" class="close-btn" aria-label="Close inspector">&times;</button>
+          <h3 class="inspector-title" data-i18n="trade.details">Details zur Aktion</h3>
+          <button id="closeInspectorBtn" class="close-btn" data-i18n-aria-label="trade.closeAria" aria-label="Details schließen">&times;</button>
         </div>
         <div class="inspector-grid">
           <div class="inspector-card">
-            <span class="inspector-label">Holding Period</span>
+            <span class="inspector-label" data-i18n="trade.hold">Haltedauer</span>
             <strong id="tradeHoldDays">-</strong>
           </div>
           <div class="inspector-card" id="tradeProfitCard">
-            <span class="inspector-label">Trade Net Profit</span>
+            <span class="inspector-label" data-i18n="trade.profit">Gewinn dieser Aktion</span>
             <strong id="tradeNetProfit">-</strong>
           </div>
           <div class="inspector-card" id="tradeRoiCard">
-            <span class="inspector-label">Trade ROI</span>
+            <span class="inspector-label">
+              <span data-i18n="trade.roi">Rendite dieser Aktion (ROI)</span>
+              <span class="help-tip" tabindex="0" data-i18n-tooltip="trade.roiTooltip" data-tooltip="ROI bedeutet Return on Investment: prozentuale Rendite eines einzelnen Kaufs oder Verkaufs." aria-label="Info">?</span>
+            </span>
             <strong id="tradeRoi">-</strong>
           </div>
           <div class="inspector-card">
-            <span class="inspector-label">Fees Paid</span>
+            <span class="inspector-label" data-i18n="trade.fees">Gezahlte Gebühren</span>
             <strong id="tradeFees">-</strong>
           </div>
         </div>
@@ -381,36 +448,34 @@
     </section>
   </main>
 
-  <!-- Parameter Optimization Modal -->
   <div id="optimizationModal" class="modal-overlay" hidden>
     <div class="modal-content">
       <div class="modal-header">
-        <h2>Parameter Grid Sweep Optimizer</h2>
-        <button id="closeOptimizeModalBtn" class="close-btn" aria-label="Close optimization modal">&times;</button>
+        <h2 data-i18n="optimizer.title">Parameter-Suche</h2>
+        <button id="closeOptimizeModalBtn" class="close-btn" data-i18n-aria-label="optimizer.closeAria" aria-label="Parameter-Suche schließen">&times;</button>
       </div>
-      <p class="modal-desc">Evaluating performance metrics across a grid of parameter combinations for the active strategy...</p>
+      <p class="modal-desc" data-i18n="optimizer.desc">Die App testet mehrere Einstellungen und zeigt die besten Ergebnisse.</p>
       
       <div id="optimizerLoading" class="optimizer-loading" hidden>
         <div class="spinner"></div>
-        <span>Backtesting configurations...</span>
+        <span data-i18n="optimizer.loading">Einstellungen werden getestet...</span>
       </div>
 
       <div id="optimizerResults" class="optimizer-results-container" hidden>
         <table class="optimize-results-table">
           <thead>
             <tr>
-              <th>Rank</th>
-              <th>Parameters</th>
-              <th>Final Capital</th>
-              <th>Net Return</th>
-              <th>Sharpe Ratio</th>
-              <th>Max Drawdown</th>
-              <th>Trades</th>
-              <th>Action</th>
+              <th data-i18n="optimizer.rank">Rang</th>
+              <th data-i18n="optimizer.params">Einstellungen</th>
+              <th data-i18n="optimizer.finalCapital">Endkapital</th>
+              <th data-i18n="optimizer.return">Rendite</th>
+              <th data-i18n="metric.sharpe">Sharpe Ratio</th>
+              <th data-i18n="metric.drawdown">Größter Rückgang</th>
+              <th data-i18n="optimizer.trades">Aktionen</th>
+              <th data-i18n="table.action">Aktion</th>
             </tr>
           </thead>
           <tbody id="optimizeTableBody">
-            <!-- Populated via JS -->
           </tbody>
         </table>
       </div>
@@ -418,9 +483,9 @@
   </div>
 
   <footer class="app-footer">
-    <p>MacroSignal Pro Dashboard &copy; 2026. Made with Google Gemini. Professional Educational Prototype.</p>
+    <p data-i18n="footer">MacroSignal Dashboard &copy; 2026. Software-Engineering-Projekt.</p>
   </footer>
 
-  <script src="app.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>

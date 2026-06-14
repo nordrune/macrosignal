@@ -51,7 +51,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.server:
         import uvicorn
-        print(f"Starting MacroSignal Pro Dashboard on http://{args.host}:{args.port}")
+        print(f"Starting MacroSignal dashboard on http://{args.host}:{args.port}")
         uvicorn.run("trading_backtester.api:app", host=args.host, port=args.port, log_level="info")
         return 0
 
@@ -69,3 +69,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     print(format_results(result))
     return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

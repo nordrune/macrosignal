@@ -1,4 +1,9 @@
-"""FastAPI web server for the trading backtester."""
+"""FastAPI routes for the MacroSignal dashboard.
+
+The API accepts either Yahoo Finance ticker settings or custom CSV-derived
+prices from the browser. Route handlers keep validation and loading separate
+from the core backtester so the simulation can also be used from the CLI.
+"""
 
 import logging
 from dataclasses import asdict
@@ -11,20 +16,20 @@ from pydantic import BaseModel, Field
 import pandas as pd
 import yfinance as yf
 
-from trading_backtester.backtester import run_backtest, optimize_strategy_parameters
+from trading_backtester.backtester import optimize_strategy_parameters, run_backtest
 
 
-# Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+STRATEGY_DESCRIPTION = "'sma', 'ema', 'rsi', 'macd', 'bollinger', or 'combined'"
+
 app = FastAPI(
-    title="MacroSignal Pro API",
-    description="Backend API for real-time market data retrieval and multi-strategy backtesting.",
+    title="MacroSignal API",
+    description="Backend for historical market data and strategy backtesting.",
     version="1.0.0",
 )
 
-# Enable CORS for local testing/development
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -35,11 +40,15 @@ app.add_middleware(
 
 
 class PricePoint(BaseModel):
+    """Single close-price observation sent by the frontend."""
+
     date: str
     close: float
 
 
 class BacktestRequest(BaseModel):
+    """Request body for one dashboard backtest run."""
+
     prices: list[PricePoint] | None = Field(
         default=None, description="Optional custom price timeseries (for CSV upload)."
     )
@@ -59,10 +68,58 @@ class BacktestRequest(BaseModel):
         default=0.1, ge=0, description="Transaction fee percentage (0.1 means 0.1%)."
     )
     strategy_type: str = Field(
-        default="sma", description="Trading strategy type ('sma', 'ema', 'rsi', 'macd', 'bollinger')."
+        default="sma",
+        description=f"Trading strategy type ({STRATEGY_DESCRIPTION}).",
     )
     strategy_params: dict[str, Any] = Field(
         default_factory=dict, description="Key-value parameters for strategy configuration."
+    )
+
+
+def _point_to_dict(point: PricePoint) -> dict[str, Any]:
+    """Return a dict for both Pydantic v1 and v2 model instances."""
+    if hasattr(point, "model_dump"):
+        return point.model_dump()
+    return point.dict()
+
+
+def _normalise_price_frame(data: pd.DataFrame) -> pd.DataFrame:
+    """Validate and sort price data before passing it into the backtester."""
+    if data.empty:
+        raise ValueError("Price data must contain at least one row.")
+
+    frame = data.loc[:, ["date", "close"]].copy()
+    frame["date"] = pd.to_datetime(frame["date"])
+    frame["close"] = pd.to_numeric(frame["close"])
+    frame = frame.dropna()
+    frame = frame[frame["close"] > 0]
+
+    if frame.empty:
+        raise ValueError("Price data contains no valid positive close prices.")
+
+    return frame.sort_values("date").reset_index(drop=True)
+
+
+def _frame_from_price_points(prices: list[PricePoint]) -> pd.DataFrame:
+    """Convert uploaded or pasted price points to a validated pandas frame."""
+    return _normalise_price_frame(pd.DataFrame([_point_to_dict(point) for point in prices]))
+
+
+def _load_price_frame(
+    prices: list[PricePoint] | None,
+    symbol: str | None,
+    period: str,
+    interval: str,
+) -> pd.DataFrame:
+    """Load prices from custom points or Yahoo Finance, then validate them."""
+    if prices:
+        return _frame_from_price_points(prices)
+    if symbol:
+        ticker_data = get_ticker_data(symbol=symbol, period=period, interval=interval)
+        return _normalise_price_frame(pd.DataFrame(ticker_data["prices"]))
+    raise HTTPException(
+        status_code=400,
+        detail="Either 'prices' or 'symbol' must be provided.",
     )
 
 
@@ -81,7 +138,6 @@ def get_ticker_data(symbol: str, period: str = "1y", interval: str = "1d"):
 
         df = df.reset_index()
 
-        # Find date column dynamically
         date_col = None
         for col in ["Date", "Datetime", "date", "datetime"]:
             if col in df.columns:
@@ -93,9 +149,7 @@ def get_ticker_data(symbol: str, period: str = "1y", interval: str = "1d"):
         df = df.rename(columns={date_col: "date", "Close": "close"})
         df = df[["date", "close"]].copy()
 
-        # Format dates
         df["date"] = pd.to_datetime(df["date"])
-        # Remove timezone info for clean rendering
         if df["date"].dt.tz is not None:
             df["date"] = df["date"].dt.tz_localize(None)
 
@@ -108,51 +162,40 @@ def get_ticker_data(symbol: str, period: str = "1y", interval: str = "1d"):
                 detail=f"Data retrieved for '{symbol}' contains no valid prices.",
             )
 
-        # Convert to response format
+        date_format = "%Y-%m-%d %H:%M:%S" if interval.endswith("h") else "%Y-%m-%d"
         records = []
         for _, row in df.iterrows():
-            records.append({
-                "date": row["date"].strftime("%Y-%m-%d %H:%M:%S" if interval == "1h" else "%Y-%m-%d"),
-                "close": float(row["close"]),
-            })
+            records.append(
+                {
+                    "date": row["date"].strftime(date_format),
+                    "close": float(row["close"]),
+                }
+            )
         return {"symbol": symbol.upper(), "prices": records}
 
-    except Exception as e:
-        logger.error(f"Error fetching ticker {symbol}: {e}")
-        if isinstance(e, HTTPException):
-            raise e
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Error fetching ticker %s", symbol)
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to fetch market data from Yahoo Finance: {str(e)}",
-        )
+            detail=f"Failed to fetch market data from Yahoo Finance: {exc}",
+        ) from exc
 
 
 @app.post("/api/backtest")
 def execute_backtest(request: BacktestRequest):
     """Run a multi-strategy backtest on fetched or uploaded price data."""
     try:
-        if request.prices:
-            # Parse custom prices list
-            df = pd.DataFrame([p.model_dump() for p in request.prices])
-            df["date"] = pd.to_datetime(df["date"])
-            df["close"] = pd.to_numeric(df["close"])
-        elif request.symbol:
-            # Fetch from Yahoo Finance
-            ticker_data = get_ticker_data(
-                symbol=request.symbol, period=request.period, interval=request.interval
-            )
-            df = pd.DataFrame(ticker_data["prices"])
-            df["date"] = pd.to_datetime(df["date"])
-            df["close"] = pd.to_numeric(df["close"])
-        else:
-            raise HTTPException(
-                status_code=400,
-                detail="Either 'prices' or 'symbol' must be provided in request.",
-            )
-
+        price_frame = _load_price_frame(
+            prices=request.prices,
+            symbol=request.symbol,
+            period=request.period,
+            interval=request.interval,
+        )
         fee_rate = request.transaction_fee_percent / 100.0
         result = run_backtest(
-            price_data=df,
+            price_data=price_frame,
             starting_capital=request.starting_capital,
             transaction_fee_rate=fee_rate,
             strategy_type=request.strategy_type,
@@ -161,17 +204,19 @@ def execute_backtest(request: BacktestRequest):
 
         return asdict(result)
 
-    except ValueError as e:
-        logger.error(f"Validation error in backtest: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"Error running backtest: {e}")
-        if isinstance(e, HTTPException):
-            raise e
-        raise HTTPException(status_code=500, detail=f"Backtester error: {str(e)}")
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        logger.info("Validation error in backtest: %s", exc)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Error running backtest")
+        raise HTTPException(status_code=500, detail=f"Backtester error: {exc}") from exc
 
 
 class OptimizeRequest(BaseModel):
+    """Request body for the parameter search endpoint."""
+
     prices: list[PricePoint] | None = Field(default=None)
     symbol: str | None = Field(default=None)
     period: str = "1y"
@@ -185,26 +230,15 @@ class OptimizeRequest(BaseModel):
 def optimize_strategy(request: OptimizeRequest):
     """Run a parameter sweep grid search and return the top 5 parameter configurations."""
     try:
-        if request.prices:
-            df = pd.DataFrame([p.model_dump() for p in request.prices])
-            df["date"] = pd.to_datetime(df["date"])
-            df["close"] = pd.to_numeric(df["close"])
-        elif request.symbol:
-            ticker_data = get_ticker_data(
-                symbol=request.symbol, period=request.period, interval=request.interval
-            )
-            df = pd.DataFrame(ticker_data["prices"])
-            df["date"] = pd.to_datetime(df["date"])
-            df["close"] = pd.to_numeric(df["close"])
-        else:
-            raise HTTPException(
-                status_code=400,
-                detail="Either 'prices' or 'symbol' must be provided.",
-            )
-
+        price_frame = _load_price_frame(
+            prices=request.prices,
+            symbol=request.symbol,
+            period=request.period,
+            interval=request.interval,
+        )
         fee_rate = request.transaction_fee_percent / 100.0
         best_runs = optimize_strategy_parameters(
-            price_data=df,
+            price_data=price_frame,
             starting_capital=request.starting_capital,
             transaction_fee_rate=fee_rate,
             strategy_type=request.strategy_type,
@@ -212,18 +246,20 @@ def optimize_strategy(request: OptimizeRequest):
 
         return {"strategy_type": request.strategy_type, "runs": best_runs}
 
-    except ValueError as e:
-        logger.error(f"Validation error in optimization: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"Error running optimization: {e}")
-        if isinstance(e, HTTPException):
-            raise e
-        raise HTTPException(status_code=500, detail=f"Optimizer error: {str(e)}")
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        logger.info("Validation error in optimization: %s", exc)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Error running optimization")
+        raise HTTPException(status_code=500, detail=f"Optimizer error: {exc}") from exc
 
 
-# Serve static web frontend
 try:
     app.mount("/", StaticFiles(directory="frontend", html=True), name="static")
-except Exception as e:
-    logger.warning(f"Could not mount static files directory: {e}. API endpoints remain active.")
+except Exception as exc:
+    logger.warning(
+        "Could not mount static files directory: %s. API endpoints remain active.",
+        exc,
+    )
