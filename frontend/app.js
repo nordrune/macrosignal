@@ -10,7 +10,6 @@ import { SAMPLE_CSV, parseCsvText } from "./csv.js";
 import { formatCurrency, hasNumber, setSignedText } from "./formatters.js";
 import { initI18n, t } from "./i18n.js";
 import {
-  applyStrategyParams,
   getStrategyParams,
   updateStrategyControls
 } from "./strategy-config.js";
@@ -36,8 +35,6 @@ const el = {
   feeRate: document.getElementById("feeRate"),
   autoRun: document.getElementById("autoRun"),
   runButton: document.getElementById("runButton"),
-  optimizeBtn: document.getElementById("optimizeBtn"),
-  loadSampleBtn: document.getElementById("loadSampleBtn"),
   statusMessage: document.getElementById("statusMessage"),
   activeStrategy: document.getElementById("activeStrategy"),
   activeTicker: document.getElementById("activeTicker"),
@@ -74,13 +71,7 @@ const el = {
   tradeHoldDays: document.getElementById("tradeHoldDays"),
   tradeNetProfit: document.getElementById("tradeNetProfit"),
   tradeRoi: document.getElementById("tradeRoi"),
-  tradeFees: document.getElementById("tradeFees"),
-
-  optimizationModal: document.getElementById("optimizationModal"),
-  closeOptimizeModalBtn: document.getElementById("closeOptimizeModalBtn"),
-  optimizerLoading: document.getElementById("optimizerLoading"),
-  optimizerResults: document.getElementById("optimizerResults"),
-  optimizeTableBody: document.getElementById("optimizeTableBody")
+  tradeFees: document.getElementById("tradeFees")
 };
 
 const state = {
@@ -92,7 +83,6 @@ const state = {
   sharpeRatio: 0,
   maxDrawdown: 0,
   buyAndHoldReturn: 0,
-  optimizationRuns: [],
   lastResult: null,
   statusKey: null,
   statusType: "info",
@@ -162,7 +152,6 @@ function refreshLanguageSensitiveUi() {
   if (state.lastResult) {
     renderResults(state.lastResult);
     renderTradeLog(state.trades);
-    renderOptimizationTable(state.optimizationRuns);
     renderSelectedPoint(
       state.selectedPointIndex !== null ? state.strategyData[state.selectedPointIndex] : null
     );
@@ -259,126 +248,6 @@ async function runBacktest() {
     console.error(error);
     setStatusText(error.message, "error");
   }
-}
-
-// --- PARAMETER OPTIMIZATION ---
-
-/**
- * Run the backend parameter grid search for the currently selected strategy.
- */
-async function runOptimization() {
-  el.optimizationModal.hidden = false;
-  el.optimizerLoading.hidden = false;
-  el.optimizerResults.hidden = true;
-  
-  try {
-    const startingCapital = parseFloat(el.startingCapital.value);
-    const feeRate = parseFloat(el.feeRate.value);
-    const strategy = el.strategySelect.value;
-    
-    let payload = {
-      starting_capital: startingCapital,
-      transaction_fee_percent: feeRate,
-      strategy_type: strategy
-    };
-    
-    if (state.dataSource === "api") {
-      const ticker = el.tickerInput.value.trim().toUpperCase();
-      if (!ticker) throw new Error(t("error.tickerFirst"));
-      payload.symbol = ticker;
-      payload.period = el.periodSelect.value;
-      payload.interval = el.intervalSelect.value;
-    } else {
-      payload.prices = parseCsvText(el.csvText.value);
-    }
-    
-    const response = await fetch("/api/optimize", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-    
-    if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.detail || t("error.optimize"));
-    }
-    
-    const result = await response.json();
-    state.optimizationRuns = result.runs;
-    
-    renderOptimizationTable(result.runs);
-    el.optimizerLoading.hidden = true;
-    el.optimizerResults.hidden = false;
-    
-  } catch (error) {
-    console.error(error);
-    el.optimizationModal.hidden = true;
-    setStatusKey("status.optimizeFailed", "error", { message: error.message });
-  }
-}
-
-/**
- * Render optimizer results and bind each "apply" button to the matching run.
- *
- * @param {Array<{params: Record<string, number>, end_capital: number, profit_loss_percent: number, sharpe_ratio: number, max_drawdown: number, total_trades: number}>} runs Optimizer output.
- */
-function renderOptimizationTable(runs) {
-  if (!runs || runs.length === 0) {
-    el.optimizeTableBody.innerHTML = `
-      <tr>
-        <td colspan="8" class="empty-table-msg">${t("optimizer.noRuns")}</td>
-      </tr>
-    `;
-    return;
-  }
-  
-  el.optimizeTableBody.innerHTML = runs.map((run, idx) => {
-    // Generate param badges
-    const badges = Object.entries(run.params)
-      .map(([key, value]) => {
-        const label = t(`param.${key}`) || key;
-        return `<span class="optimize-param-badge">${label}: ${value}</span>`;
-      })
-      .join(" ");
-      
-    const roiClass = run.profit_loss_percent > 0 ? "positive" : (run.profit_loss_percent < 0 ? "negative" : "");
-    const roiPrefix = run.profit_loss_percent > 0 ? "+" : "";
-    
-    return `
-      <tr>
-        <td class="font-mono" style="font-weight:700;">#${idx + 1}</td>
-        <td>${badges}</td>
-        <td class="font-mono">${formatCurrency(run.end_capital)}</td>
-        <td class="font-mono ${roiClass}" style="font-weight:700;">${roiPrefix}${run.profit_loss_percent.toFixed(2)}%</td>
-        <td class="font-mono">${run.sharpe_ratio.toFixed(2)}</td>
-        <td class="font-mono">${run.max_drawdown.toFixed(2)}%</td>
-        <td class="font-mono">${run.total_trades}</td>
-        <td>
-          <button class="optimize-apply-btn" data-run-index="${idx}">${t("optimizer.apply")}</button>
-        </td>
-      </tr>
-    `;
-  }).join("");
-  
-  // Bind Apply buttons
-  el.optimizeTableBody.querySelectorAll(".optimize-apply-btn").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const runIdx = parseInt(e.target.dataset.runIndex, 10);
-      applyOptimizedParams(state.optimizationRuns[runIdx].params);
-    });
-  });
-}
-
-/**
- * Write optimizer parameters into the form and rerun the simulation.
- *
- * @param {Record<string, number>} params Parameter values returned by the API.
- */
-function applyOptimizedParams(params) {
-  const strategy = el.strategySelect.value;
-  applyStrategyParams(strategy, params);
-  el.optimizationModal.hidden = true;
-  runBacktest();
 }
 
 function applyStatusMessage(msg, type = "info") {
@@ -579,16 +448,8 @@ function renderSelectedPoint(row) {
   
   const strategy = el.strategySelect.value;
   let valStr = "-";
-  if (strategy === "sma" || strategy === "ema" || strategy === "combined") {
+  if (strategy === "sma" || strategy === "ema") {
     valStr = hasNumber(row.moving_average) ? formatCurrency(row.moving_average) : "-";
-  } else if (strategy === "rsi") {
-    valStr = hasNumber(row.rsi) ? `${row.rsi.toFixed(2)}` : "-";
-  } else if (strategy === "macd") {
-    valStr = hasNumber(row.macd_line)
-      ? `MACD: ${row.macd_line.toFixed(2)} / Sig: ${row.signal_line.toFixed(2)}`
-      : "-";
-  } else if (strategy === "bollinger") {
-    valStr = hasNumber(row.bb_middle) ? `${formatCurrency(row.bb_middle)}` : "-";
   }
   
   el.selectedAverage.textContent = valStr;
@@ -706,13 +567,8 @@ function drawCharts(progress = 1) {
   const closeVals = data.map((d, i) => ({ index: i, value: d.close }));
   let mainVals = [...closeVals.map(v => v.value)];
   
-  if (strategy === "sma" || strategy === "ema" || strategy === "combined") {
+  if (strategy === "sma" || strategy === "ema") {
     data.forEach((d) => { if (d.moving_average !== null) mainVals.push(d.moving_average); });
-  } else if (strategy === "bollinger") {
-    data.forEach((d) => {
-      if (d.bb_upper !== null) mainVals.push(d.bb_upper);
-      if (d.bb_lower !== null) mainVals.push(d.bb_lower);
-    });
   }
   
   const minPrice = Math.min(...mainVals);
@@ -725,41 +581,9 @@ function drawCharts(progress = 1) {
   drawGrid(priceHelpers.ctx, margin, priceHelpers.width, priceHelpers.height, minPrice - pricePad, maxPrice + pricePad, 4, formatCurrency);
   drawLine(priceHelpers.ctx, closeVals, priceHelpers.xForIdx, priceHelpers.yForVal, "#f3f4f6", 2.2, progress);
 
-  if (strategy === "sma" || strategy === "ema" || strategy === "combined") {
+  if (strategy === "sma" || strategy === "ema") {
     const maVals = data.map((d, i) => ({ index: i, value: d.moving_average }));
     drawLine(priceHelpers.ctx, maVals, priceHelpers.xForIdx, priceHelpers.yForVal, "#00e6c3", 1.8, progress);
-  } else if (strategy === "bollinger") {
-    const middleVals = data.map((d, i) => ({ index: i, value: d.bb_middle }));
-    const upperVals = data.map((d, i) => ({ index: i, value: d.bb_upper }));
-    const lowerVals = data.map((d, i) => ({ index: i, value: d.bb_lower }));
-    
-    drawLine(priceHelpers.ctx, middleVals, priceHelpers.xForIdx, priceHelpers.yForVal, "#00bfa5", 1.5, progress);
-    drawLine(priceHelpers.ctx, upperVals, priceHelpers.xForIdx, priceHelpers.yForVal, "rgba(251, 191, 36, 0.6)", 1.2, progress);
-    drawLine(priceHelpers.ctx, lowerVals, priceHelpers.xForIdx, priceHelpers.yForVal, "rgba(251, 191, 36, 0.6)", 1.2, progress);
-    
-    const limit = Math.max(1, Math.ceil(len * progress));
-    priceHelpers.ctx.fillStyle = "rgba(251, 191, 36, 0.03)";
-    priceHelpers.ctx.beginPath();
-    let started = false;
-    for (let i = 0; i < limit; i++) {
-      if (upperVals[i].value === null || lowerVals[i].value === null) continue;
-      const x = priceHelpers.xForIdx(i);
-      const y = priceHelpers.yForVal(upperVals[i].value);
-      if (!started) {
-        priceHelpers.ctx.moveTo(x, y);
-        started = true;
-      } else {
-        priceHelpers.ctx.lineTo(x, y);
-      }
-    }
-    for (let i = limit - 1; i >= 0; i--) {
-      if (upperVals[i].value === null || lowerVals[i].value === null) continue;
-      const x = priceHelpers.xForIdx(i);
-      const y = priceHelpers.yForVal(lowerVals[i].value);
-      priceHelpers.ctx.lineTo(x, y);
-    }
-    priceHelpers.ctx.closePath();
-    priceHelpers.ctx.fill();
   }
   
   if (state.selectedTradeIndex !== null && state.trades[state.selectedTradeIndex]) {
@@ -814,113 +638,42 @@ function drawCharts(progress = 1) {
     priceHelpers.ctx.stroke();
   }
 
-  let subMin = 0;
-  let subMax = 100;
-  let formatFn = (v) => v.toFixed(0);
-  
-  if (strategy === "rsi" || strategy === "combined") {
-    subMin = 0;
-    subMax = 100;
-    formatFn = (v) => `${v.toFixed(0)}`;
-  } else if (strategy === "macd") {
-    const macdLines = [];
-    data.forEach((d) => {
-      if (d.macd_line !== null) macdLines.push(d.macd_line);
-      if (d.signal_line !== null) macdLines.push(d.signal_line);
-      if (d.macd_histogram !== null) macdLines.push(d.macd_histogram);
-    });
-    subMin = Math.min(...macdLines, -0.5);
-    subMax = Math.max(...macdLines, 0.5);
-    const pad = (subMax - subMin) * 0.05;
-    subMin -= pad;
-    subMax += pad;
-  } else {
-    let maxCap = 0;
-    const dds = state.capitalHistory.map(h => {
-      if (h.capital > maxCap) maxCap = h.capital;
-      return maxCap === 0 ? 0 : ((h.capital - maxCap) / maxCap) * 100;
-    });
-    subMin = Math.min(...dds, -2);
-    subMax = 0.2;
-    formatFn = (v) => `${v.toFixed(1)}%`;
-  }
+  let maxCap = 0;
+  const dds = state.capitalHistory.map(h => {
+    if (h.capital > maxCap) maxCap = h.capital;
+    return maxCap === 0 ? 0 : ((h.capital - maxCap) / maxCap) * 100;
+  });
+  const subMin = Math.min(...dds, -2);
+  const subMax = 0.2;
+  const formatFn = (v) => `${v.toFixed(1)}%`;
   
   const subHelpers = getChartHelpers(el.indicatorChart, margin, len, subMin, subMax);
   state.subChartGeom = subHelpers;
   
   drawGrid(subHelpers.ctx, margin, subHelpers.width, subHelpers.height, subMin, subMax, 2, formatFn);
   
-  if (strategy === "rsi" || strategy === "combined") {
-    const buyThresh = strategy === "rsi"
-      ? (parseInt(document.getElementById("rsi_buy").value, 10) || 30)
-      : (parseInt(document.getElementById("comb_rsi_buy").value, 10) || 50);
-    const sellThresh = strategy === "rsi"
-      ? (parseInt(document.getElementById("rsi_sell").value, 10) || 70)
-      : (parseInt(document.getElementById("comb_rsi_sell").value, 10) || 70);
+  maxCap = 0;
+  const ddVals = state.capitalHistory.map((h, i) => {
+    if (h.capital > maxCap) maxCap = h.capital;
+    return {
+      index: i,
+      value: maxCap === 0 ? 0 : ((h.capital - maxCap) / maxCap) * 100
+    };
+  });
 
-    subHelpers.ctx.strokeStyle = "rgba(244, 63, 94, 0.25)";
-    subHelpers.ctx.lineWidth = 1;
-    subHelpers.ctx.setLineDash([4, 4]);
-    
-    subHelpers.ctx.beginPath();
-    subHelpers.ctx.moveTo(margin.left, subHelpers.yForVal(sellThresh));
-    subHelpers.ctx.lineTo(margin.left + subHelpers.width, subHelpers.yForVal(sellThresh));
-    subHelpers.ctx.stroke();
-    
-    subHelpers.ctx.strokeStyle = "rgba(16, 185, 129, 0.25)";
-    subHelpers.ctx.beginPath();
-    subHelpers.ctx.moveTo(margin.left, subHelpers.yForVal(buyThresh));
-    subHelpers.ctx.lineTo(margin.left + subHelpers.width, subHelpers.yForVal(buyThresh));
-    subHelpers.ctx.stroke();
-    subHelpers.ctx.setLineDash([]);
-    
-    const rsiVals = data.map((d, i) => ({ index: i, value: d.rsi }));
-    drawLine(subHelpers.ctx, rsiVals, subHelpers.xForIdx, subHelpers.yForVal, "#9333ea", 1.6, progress);
-    
-  } else if (strategy === "macd") {
-    const histVals = data.map((d, i) => ({ index: i, value: d.macd_histogram }));
-    const limit = Math.max(1, Math.ceil(len * progress));
-    const barWidth = Math.max(1, (subHelpers.width / len) * 0.7);
-    const zeroY = subHelpers.yForVal(0);
-    
-    for (let i = 0; i < limit; i++) {
-      const val = histVals[i].value;
-      if (val === null || val === undefined) continue;
-      const x = subHelpers.xForIdx(i) - barWidth / 2;
-      const y = subHelpers.yForVal(val);
-      subHelpers.ctx.fillStyle = val >= 0 ? "rgba(16, 185, 129, 0.4)" : "rgba(244, 63, 94, 0.4)";
-      subHelpers.ctx.fillRect(x, zeroY, barWidth, y - zeroY);
-    }
-    
-    const macdLineVals = data.map((d, i) => ({ index: i, value: d.macd_line }));
-    const signalLineVals = data.map((d, i) => ({ index: i, value: d.signal_line }));
-    drawLine(subHelpers.ctx, macdLineVals, subHelpers.xForIdx, subHelpers.yForVal, "#3b82f6", 1.3, progress);
-    drawLine(subHelpers.ctx, signalLineVals, subHelpers.xForIdx, subHelpers.yForVal, "#f97316", 1.3, progress);
-    
-  } else {
-    let maxCap = 0;
-    const ddVals = state.capitalHistory.map((h, i) => {
-      if (h.capital > maxCap) maxCap = h.capital;
-      return {
-        index: i,
-        value: maxCap === 0 ? 0 : ((h.capital - maxCap) / maxCap) * 100
-      };
-    });
-    
-    drawLine(subHelpers.ctx, ddVals, subHelpers.xForIdx, subHelpers.yForVal, "#f43f5e", 1.5, progress);
-    
-    const limit = Math.max(1, Math.ceil(len * progress));
-    const zeroY = subHelpers.yForVal(0);
-    subHelpers.ctx.fillStyle = "rgba(244, 63, 94, 0.05)";
-    subHelpers.ctx.beginPath();
-    subHelpers.ctx.moveTo(subHelpers.xForIdx(0), zeroY);
-    for (let i = 0; i < limit; i++) {
-      subHelpers.ctx.lineTo(subHelpers.xForIdx(i), subHelpers.yForVal(ddVals[i].value));
-    }
-    subHelpers.ctx.lineTo(subHelpers.xForIdx(limit - 1), zeroY);
-    subHelpers.ctx.closePath();
-    subHelpers.ctx.fill();
+  drawLine(subHelpers.ctx, ddVals, subHelpers.xForIdx, subHelpers.yForVal, "#f43f5e", 1.5, progress);
+
+  const limit = Math.max(1, Math.ceil(len * progress));
+  const zeroY = subHelpers.yForVal(0);
+  subHelpers.ctx.fillStyle = "rgba(244, 63, 94, 0.05)";
+  subHelpers.ctx.beginPath();
+  subHelpers.ctx.moveTo(subHelpers.xForIdx(0), zeroY);
+  for (let i = 0; i < limit; i++) {
+    subHelpers.ctx.lineTo(subHelpers.xForIdx(i), subHelpers.yForVal(ddVals[i].value));
   }
+  subHelpers.ctx.lineTo(subHelpers.xForIdx(limit - 1), zeroY);
+  subHelpers.ctx.closePath();
+  subHelpers.ctx.fill();
   
   if (state.selectedPointIndex !== null) {
     const hx = subHelpers.xForIdx(state.selectedPointIndex);
@@ -1023,11 +776,6 @@ function setupEventListeners() {
 
   el.strategySelect.addEventListener("change", handleStrategyChange);
 
-  el.optimizeBtn.addEventListener("click", runOptimization);
-  el.closeOptimizeModalBtn.addEventListener("click", () => {
-    el.optimizationModal.hidden = true;
-  });
-  
   el.closeInspectorBtn.addEventListener("click", () => {
     el.tradeInspectorPanel.hidden = true;
     state.selectedTradeIndex = null;
@@ -1086,12 +834,6 @@ function setupEventListeners() {
   });
   
   el.runButton.addEventListener("click", runBacktest);
-  el.loadSampleBtn.addEventListener("click", () => {
-    setDataSource("csv");
-    el.csvText.value = SAMPLE_CSV;
-    runBacktest();
-  });
-  
   el.priceChart.addEventListener("mousemove", (e) => {
     const idx = findNearestIndex(e.clientX, state.chartGeom);
     if (idx !== null) {

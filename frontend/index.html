@@ -112,15 +112,11 @@
       <div class="input-group">
         <label for="strategySelect">
           <span data-i18n="strategy.label">Strategie</span>
-          <span class="help-tip" tabindex="0" data-i18n-tooltip="strategy.tooltip" data-tooltip="Eine Regel, nach der die App rückwirkend entscheidet: kaufen, verkaufen oder halten. SMA/EMA sind Durchschnittslinien, RSI misst Stärke/Schwäche, MACD sucht Trendwechsel." aria-label="Info">?</span>
+          <span class="help-tip" tabindex="0" data-i18n-tooltip="strategy.tooltip" data-tooltip="Eine Regel, nach der die App rückwirkend entscheidet: kaufen, verkaufen oder halten. SMA und EMA sind Durchschnittslinien." aria-label="Info">?</span>
         </label>
         <select id="strategySelect">
           <option value="sma" selected data-i18n="strategy.sma">Einfacher Durchschnitt (SMA)</option>
           <option value="ema" data-i18n="strategy.ema">Gewichteter Durchschnitt (EMA)</option>
-          <option value="rsi" data-i18n="strategy.rsi">Überkauft/überverkauft (RSI)</option>
-          <option value="macd" data-i18n="strategy.macd">Trendwechsel (MACD)</option>
-          <option value="bollinger" data-i18n="strategy.bollinger">Preisspanne (Bollinger Bands)</option>
-          <option value="combined" data-i18n="strategy.combined">SMA + RSI kombiniert</option>
         </select>
       </div>
 
@@ -142,112 +138,6 @@
               <span class="help-tip" tabindex="0" data-i18n-tooltip="param.emaTooltip" data-tooltip="EMA ist ein Durchschnitt, der neue Kurse stärker gewichtet als ältere Kurse." aria-label="Info">?</span>
             </label>
             <input id="ema_window" type="number" min="1" step="1" value="20">
-          </div>
-        </div>
-
-        <div id="params_rsi" class="param-group">
-          <div class="settings-row-3">
-            <div class="input-group">
-              <label for="rsi_window">
-                <span data-i18n="param.rsiWindow">RSI-Zeitraum</span>
-                <span class="help-tip" tabindex="0" data-i18n-tooltip="param.rsiTooltip" data-tooltip="RSI misst, ob ein Asset zuletzt eher stark gestiegen oder gefallen ist. Werte nahe 0 sind schwach, Werte nahe 100 sehr stark." aria-label="Info">?</span>
-              </label>
-              <input id="rsi_window" type="number" min="1" step="1" value="14">
-            </div>
-            <div class="input-group">
-              <label for="rsi_buy">
-                <span data-i18n="param.buyThreshold">Kauf-Schwelle</span>
-                <span class="help-tip" tabindex="0" data-i18n-tooltip="param.buyThresholdTooltip" data-tooltip="Unter diesem RSI-Wert gilt das Asset als eher überverkauft. Die Strategie kann dann ein Kaufsignal erzeugen." aria-label="Info">?</span>
-              </label>
-              <input id="rsi_buy" type="number" min="1" max="99" step="1" value="30">
-            </div>
-            <div class="input-group">
-              <label for="rsi_sell">
-                <span data-i18n="param.sellThreshold">Verkauf-Schwelle</span>
-                <span class="help-tip" tabindex="0" data-i18n-tooltip="param.sellThresholdTooltip" data-tooltip="Über diesem RSI-Wert gilt das Asset als eher überkauft. Die Strategie kann dann ein Verkaufssignal erzeugen." aria-label="Info">?</span>
-              </label>
-              <input id="rsi_sell" type="number" min="1" max="99" step="1" value="70">
-            </div>
-          </div>
-        </div>
-
-        <div id="params_macd" class="param-group">
-          <div class="settings-row-3">
-            <div class="input-group">
-              <label for="macd_fast">
-                <span data-i18n="param.fastLine">Schnelle Linie</span>
-                <span class="help-tip" tabindex="0" data-i18n-tooltip="param.fastLineTooltip" data-tooltip="MACD vergleicht zwei Durchschnittslinien. Die schnelle Linie reagiert stärker auf neue Kurse." aria-label="Info">?</span>
-              </label>
-              <input id="macd_fast" type="number" min="1" step="1" value="12">
-            </div>
-            <div class="input-group">
-              <label for="macd_slow">
-                <span data-i18n="param.slowLine">Langsame Linie</span>
-                <span class="help-tip" tabindex="0" data-i18n-tooltip="param.slowLineTooltip" data-tooltip="Die langsame MACD-Linie reagiert träger und dient als Vergleich zur schnellen Linie." aria-label="Info">?</span>
-              </label>
-              <input id="macd_slow" type="number" min="1" step="1" value="26">
-            </div>
-            <div class="input-group">
-              <label for="macd_signal">
-                <span data-i18n="param.signalLine">Signallinie</span>
-                <span class="help-tip" tabindex="0" data-i18n-tooltip="param.signalLineTooltip" data-tooltip="Die Signallinie glättet den MACD. Kreuzungen werden als mögliche Kauf- oder Verkaufspunkte genutzt." aria-label="Info">?</span>
-              </label>
-              <input id="macd_signal" type="number" min="1" step="1" value="9">
-            </div>
-          </div>
-        </div>
-
-        <div id="params_bollinger" class="param-group">
-          <div class="settings-row-2">
-            <div class="input-group">
-              <label for="bb_window">
-                <span data-i18n="param.bandWindow">Band-Zeitraum</span>
-                <span class="help-tip" tabindex="0" data-i18n-tooltip="param.bandWindowTooltip" data-tooltip="Bollinger Bands zeigen eine obere und untere Preisspanne rund um den Durchschnitt." aria-label="Info">?</span>
-              </label>
-              <input id="bb_window" type="number" min="1" step="1" value="20">
-            </div>
-            <div class="input-group">
-              <label for="bb_std">
-                <span data-i18n="param.bandWidth">Band-Breite</span>
-                <span class="help-tip" tabindex="0" data-i18n-tooltip="param.bandWidthTooltip" data-tooltip="Bestimmt, wie weit die Bollinger-Bänder vom Durchschnitt entfernt liegen. Größer bedeutet breitere Bänder." aria-label="Info">?</span>
-              </label>
-              <input id="bb_std" type="number" min="0.1" step="0.1" value="2.0">
-            </div>
-          </div>
-        </div>
-
-        <div id="params_combined" class="param-group">
-          <div class="settings-row-2">
-            <div class="input-group">
-              <label for="comb_sma_window">
-                <span data-i18n="param.smaFilter">SMA-Filter</span>
-                <span class="help-tip" tabindex="0" data-i18n-tooltip="param.combinedSmaTooltip" data-tooltip="Die kombinierte Strategie kauft nur, wenn der Kurs zusätzlich zum RSI-Signal zum SMA-Filter passt." aria-label="Info">?</span>
-              </label>
-              <input id="comb_sma_window" type="number" min="1" step="1" value="20">
-            </div>
-            <div class="input-group">
-              <label for="comb_rsi_window">
-                <span data-i18n="param.rsiWindow">RSI-Zeitraum</span>
-                <span class="help-tip" tabindex="0" data-i18n-tooltip="param.combinedRsiTooltip" data-tooltip="Legt fest, wie viele Kurswerte für den RSI-Teil der kombinierten Strategie betrachtet werden." aria-label="Info">?</span>
-              </label>
-              <input id="comb_rsi_window" type="number" min="1" step="1" value="14">
-            </div>
-          </div>
-          <div class="settings-row-2">
-            <div class="input-group">
-              <label for="comb_rsi_buy">
-                <span data-i18n="param.rsiBuyFilter">RSI-Kauffilter</span>
-                <span class="help-tip" tabindex="0" data-i18n-tooltip="param.rsiBuyFilterTooltip" data-tooltip="Unter diesem RSI-Wert darf die kombinierte Strategie ein Kaufsignal prüfen." aria-label="Info">?</span>
-              </label>
-              <input id="comb_rsi_buy" type="number" min="1" max="99" step="1" value="50">
-            </div>
-            <div class="input-group">
-              <label for="comb_rsi_sell">
-                <span data-i18n="param.rsiSellFilter">RSI-Verkaufsfilter</span>
-                <span class="help-tip" tabindex="0" data-i18n-tooltip="param.rsiSellFilterTooltip" data-tooltip="Über diesem RSI-Wert darf die kombinierte Strategie ein Verkaufssignal prüfen." aria-label="Info">?</span>
-              </label>
-              <input id="comb_rsi_sell" type="number" min="1" max="99" step="1" value="70">
-            </div>
           </div>
         </div>
 
@@ -280,8 +170,6 @@
 
       <div class="action-row">
         <button id="runButton" class="primary-btn" type="button" data-i18n="action.run">Strategie testen</button>
-        <button id="optimizeBtn" class="accent-btn" type="button" data-i18n="action.optimize">Parameter suchen</button>
-        <button id="loadSampleBtn" class="secondary-btn" type="button" data-i18n="action.sample">Beispieldaten laden</button>
       </div>
 
       <div id="statusMessage" class="status-msg" role="status" aria-live="polite"></div>
@@ -447,40 +335,6 @@
       </div>
     </section>
   </main>
-
-  <div id="optimizationModal" class="modal-overlay" hidden>
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2 data-i18n="optimizer.title">Parameter-Suche</h2>
-        <button id="closeOptimizeModalBtn" class="close-btn" data-i18n-aria-label="optimizer.closeAria" aria-label="Parameter-Suche schließen">&times;</button>
-      </div>
-      <p class="modal-desc" data-i18n="optimizer.desc">Die App testet mehrere Einstellungen und zeigt die besten Ergebnisse.</p>
-      
-      <div id="optimizerLoading" class="optimizer-loading" hidden>
-        <div class="spinner"></div>
-        <span data-i18n="optimizer.loading">Einstellungen werden getestet...</span>
-      </div>
-
-      <div id="optimizerResults" class="optimizer-results-container" hidden>
-        <table class="optimize-results-table">
-          <thead>
-            <tr>
-              <th data-i18n="optimizer.rank">Rang</th>
-              <th data-i18n="optimizer.params">Einstellungen</th>
-              <th data-i18n="optimizer.finalCapital">Endkapital</th>
-              <th data-i18n="optimizer.return">Rendite</th>
-              <th data-i18n="metric.sharpe">Sharpe Ratio</th>
-              <th data-i18n="metric.drawdown">Größter Rückgang</th>
-              <th data-i18n="optimizer.trades">Aktionen</th>
-              <th data-i18n="table.action">Aktion</th>
-            </tr>
-          </thead>
-          <tbody id="optimizeTableBody">
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
 
   <footer class="app-footer">
     <p data-i18n="footer">MacroSignal Dashboard &copy; 2026. Software-Engineering-Projekt.</p>

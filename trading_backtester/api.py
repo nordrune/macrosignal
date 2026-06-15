@@ -22,7 +22,7 @@ from trading_backtester.backtester import optimize_strategy_parameters, run_back
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-STRATEGY_DESCRIPTION = "'sma', 'ema', 'rsi', 'macd', 'bollinger', or 'combined'"
+STRATEGY_DESCRIPTION = "'sma' or 'ema'"
 
 app = FastAPI(
     title="MacroSignal API",

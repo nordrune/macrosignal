@@ -11,13 +11,9 @@ does not connect to a broker and it does not place real trades.
 
 - Load historical prices from Yahoo Finance or from a CSV file.
 - Run backtests with a configurable starting balance and transaction fee.
-- Compare several rule-based strategies:
+- Compare two rule-based strategies:
   - Simple Moving Average (SMA)
   - Exponential Moving Average (EMA)
-  - Relative Strength Index (RSI)
-  - MACD
-  - Bollinger Bands
-  - Combined SMA + RSI filter
 - Show performance metrics:
   - final capital
   - profit or loss
