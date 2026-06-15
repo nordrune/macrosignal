@@ -14,7 +14,7 @@
 	bind:this={ref}
 	data-slot="table-row"
 	class={cn(
-		'hover:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors',
+		'border-b transition-colors hover:bg-[var(--surface-row-hover)] data-[state=selected]:bg-[var(--surface-row-selected)]',
 		className
 	)}
 	{...restProps}
