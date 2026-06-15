@@ -6,20 +6,18 @@ only that signal column, while the dashboard also reads the indicator columns
 for chart overlays.
 """
 
+from typing import Any
+
 import pandas as pd
 
-from trading_backtester.models import Signal, StrategyType
-
+from trading_backtester.models import (
+    Signal,
+    StrategyType,
+    normalize_strategy_type,
+)
 
 DEFAULT_MOVING_AVERAGE_WINDOW = 20
 SUPPORTED_STRATEGIES = {strategy.value for strategy in StrategyType}
-
-
-def _normalise_strategy_type(strategy_type: str | StrategyType) -> str:
-    """Return the lowercase strategy value used internally."""
-    if isinstance(strategy_type, StrategyType):
-        return strategy_type.value
-    return str(strategy_type).strip().lower()
 
 
 def _assign_signals(
@@ -92,7 +90,7 @@ def generate_signal(close_price: float, moving_average: float) -> Signal:
 def generate_strategy_signals(
     price_data: pd.DataFrame,
     strategy_type: str | StrategyType = StrategyType.SMA,
-    **kwargs,
+    **kwargs: Any,
 ) -> pd.DataFrame:
     """Generate indicators and buy/sell/hold signals for a selected strategy.
 
@@ -103,12 +101,12 @@ def generate_strategy_signals(
             and EMA.
 
     Returns:
-        Copy of ``price_data`` with indicator columns and a string ``signal`` column.
+        Copy of ``price_data`` with indicator columns and a ``signal`` column.
 
     Raises:
-        ValueError: If the strategy type is unknown or indicator parameters are invalid.
+        ValueError: If the strategy type is unknown or parameters are invalid.
     """
-    strategy = _normalise_strategy_type(strategy_type)
+    strategy = normalize_strategy_type(strategy_type)
     if strategy not in SUPPORTED_STRATEGIES:
         raise ValueError(f"Unknown strategy type: {strategy_type}")
 
@@ -135,7 +133,6 @@ def generate_strategy_signals(
             sell_condition=close < data["moving_average"],
         )
 
-    data["signal"] = data["signal"].apply(lambda s: s.value if hasattr(s, "value") else s)
     return data
 
 
@@ -144,4 +141,6 @@ def add_strategy_signals(
     window: int = DEFAULT_MOVING_AVERAGE_WINDOW,
 ) -> pd.DataFrame:
     """Add SMA values and signals; kept for older tests and CLI examples."""
-    return generate_strategy_signals(price_data, strategy_type="sma", window=window)
+    return generate_strategy_signals(
+        price_data, strategy_type="sma", window=window
+    )

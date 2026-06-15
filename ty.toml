@@ -1,0 +1,10 @@
+# ty type checker config
+[environment]
+extra-paths = ["trading_backtester"]
+
+[src]
+include = ["trading_backtester", "tests", "*.py"]
+exclude = ["__pycache__", ".venv"]
+
+[rules]
+unresolved-import = "error"

@@ -2,7 +2,6 @@
 
 import pandas as pd
 import pytest
-
 from trading_backtester.backtester import run_backtest
 
 

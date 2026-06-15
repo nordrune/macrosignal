@@ -6,23 +6,39 @@ from the core backtester so the simulation can also be used from the CLI.
 """
 
 import logging
+import os
 from dataclasses import asdict
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
 import pandas as pd
 import yfinance as yf
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+from starlette.datastructures import Headers
+from starlette.responses import Response
+from starlette.staticfiles import StaticFiles
+from starlette.types import Scope
 
-from trading_backtester.backtester import optimize_strategy_parameters, run_backtest
-
+from trading_backtester.backtester import (
+    optimize_strategy_parameters,
+    run_backtest,
+)
+from trading_backtester.models import BacktestResult
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 STRATEGY_DESCRIPTION = "'sma' or 'ema'"
+
+
+class TickerNotFoundError(ValueError):
+    """Raised when Yahoo Finance returns no rows for a symbol."""
+
+
+class TickerDataInvalidError(ValueError):
+    """Raised when fetched ticker data has no usable close prices."""
+
 
 app = FastAPI(
     title="MacroSignal API",
@@ -46,34 +62,95 @@ class PricePoint(BaseModel):
     close: float
 
 
-class BacktestRequest(BaseModel):
-    """Request body for one dashboard backtest run."""
+class PriceSourceRequest(BaseModel):
+    """Shared price-source fields for dashboard endpoints."""
 
     prices: list[PricePoint] | None = Field(
-        default=None, description="Optional custom price timeseries (for CSV upload)."
+        default=None,
+        description="Optional custom price timeseries (for CSV upload).",
     )
     symbol: str | None = Field(
-        default=None, description="Yahoo Finance ticker symbol (e.g., 'AAPL', 'BTC-USD')."
+        default=None,
+        description="Yahoo Finance ticker symbol (e.g., 'AAPL', 'BTC-USD').",
     )
     period: str = Field(
-        default="1y", description="History period to fetch (e.g., '1mo', '3mo', '6mo', '1y', 'max')."
+        default="1y",
+        description=(
+            "History period to fetch (e.g., '1mo', '3mo', '6mo', '1y', 'max')."
+        ),
     )
     interval: str = Field(
         default="1d", description="Bar interval (e.g., '1h', '1d', '1wk')."
     )
+
+
+class BacktestRequest(PriceSourceRequest):
+    """Request body for one dashboard backtest run."""
+
     starting_capital: float = Field(
         default=10000.0, gt=0, description="Virtual starting capital."
     )
     transaction_fee_percent: float = Field(
-        default=0.1, ge=0, description="Transaction fee percentage (0.1 means 0.1%)."
+        default=0.1,
+        ge=0,
+        description="Transaction fee percentage (0.1 means 0.1%).",
     )
     strategy_type: str = Field(
         default="sma",
         description=f"Trading strategy type ({STRATEGY_DESCRIPTION}).",
     )
     strategy_params: dict[str, Any] = Field(
-        default_factory=dict, description="Key-value parameters for strategy configuration."
+        default_factory=dict,
+        description="Key-value parameters for strategy configuration.",
     )
+
+
+class OptimizeRequest(PriceSourceRequest):
+    """Request body for the parameter search endpoint."""
+
+    starting_capital: float = Field(
+        default=10000.0, gt=0, description="Virtual starting capital."
+    )
+    transaction_fee_percent: float = Field(
+        default=0.1,
+        ge=0,
+        description="Transaction fee percentage (0.1 means 0.1%).",
+    )
+    strategy_type: str = Field(
+        default="sma",
+        description=f"Trading strategy type ({STRATEGY_DESCRIPTION}).",
+    )
+
+
+class BacktestResponse(BaseModel):
+    """Serialised backtest result returned to the dashboard."""
+
+    start_capital: float
+    end_capital: float
+    profit_loss: float
+    profit_loss_percent: float
+    buy_trades: int
+    sell_trades: int
+    final_status: str
+    sharpe_ratio: float
+    max_drawdown: float
+    win_rate: float
+    buy_and_hold_return: float
+    capital_history: list[dict[str, object]]
+    series_data: list[dict[str, object]]
+    trades: list[dict[str, object]]
+
+    @classmethod
+    def from_result(cls, result: BacktestResult) -> "BacktestResponse":
+        """Build an API response from a backtest result dataclass."""
+        return cls.model_validate(asdict(result))
+
+
+class OptimizeResponse(BaseModel):
+    """Top parameter configurations from the optimizer."""
+
+    strategy_type: str
+    runs: list[dict[str, Any]]
 
 
 def _point_to_dict(point: PricePoint) -> dict[str, Any]:
@@ -102,20 +179,83 @@ def _normalise_price_frame(data: pd.DataFrame) -> pd.DataFrame:
 
 def _frame_from_price_points(prices: list[PricePoint]) -> pd.DataFrame:
     """Convert uploaded or pasted price points to a validated pandas frame."""
-    return _normalise_price_frame(pd.DataFrame([_point_to_dict(point) for point in prices]))
+    return _normalise_price_frame(
+        pd.DataFrame([_point_to_dict(point) for point in prices])
+    )
 
 
-def _load_price_frame(
-    prices: list[PricePoint] | None,
-    symbol: str | None,
-    period: str,
-    interval: str,
-) -> pd.DataFrame:
+def _fetch_yahoo_prices(
+    symbol: str,
+    period: str = "1y",
+    interval: str = "1d",
+) -> dict[str, Any]:
+    """Fetch historical close prices for a symbol from Yahoo Finance.
+
+    Raises:
+        TickerNotFoundError: When Yahoo Finance returns no rows.
+        TickerDataInvalidError: When fetched data has no usable prices.
+    """
+    logger.info(
+        "Fetching history for: %s (period=%s, interval=%s)",
+        symbol,
+        period,
+        interval,
+    )
+    ticker = yf.Ticker(symbol)
+    df = ticker.history(period=period, interval=interval)
+    if df.empty:
+        raise TickerNotFoundError(
+            f"No market data returned for symbol '{symbol}'. "
+            "Verify the symbol name."
+        )
+
+    df = df.reset_index()
+
+    date_col = None
+    for col in ["Date", "Datetime", "date", "datetime"]:
+        if col in df.columns:
+            date_col = col
+            break
+    if date_col is None:
+        date_col = df.columns[0]
+
+    df = df.rename(columns={date_col: "date", "Close": "close"})
+    df = df[["date", "close"]].copy()
+
+    df["date"] = pd.to_datetime(df["date"])
+    if df["date"].dt.tz is not None:
+        df["date"] = df["date"].dt.tz_localize(None)
+
+    df = df.dropna()
+    df = df[df["close"] > 0]
+
+    if df.empty:
+        raise TickerDataInvalidError(
+            f"Data retrieved for '{symbol}' contains no valid prices."
+        )
+
+    date_format = "%Y-%m-%d %H:%M:%S" if interval.endswith("h") else "%Y-%m-%d"
+    records = []
+    for _, row in df.iterrows():
+        records.append(
+            {
+                "date": row["date"].strftime(date_format),
+                "close": float(row["close"]),
+            }
+        )
+    return {"symbol": symbol.upper(), "prices": records}
+
+
+def _load_price_frame(source: PriceSourceRequest) -> pd.DataFrame:
     """Load prices from custom points or Yahoo Finance, then validate them."""
-    if prices:
-        return _frame_from_price_points(prices)
-    if symbol:
-        ticker_data = get_ticker_data(symbol=symbol, period=period, interval=interval)
+    if source.prices:
+        return _frame_from_price_points(source.prices)
+    if source.symbol:
+        ticker_data = _fetch_yahoo_prices(
+            symbol=source.symbol,
+            period=source.period,
+            interval=source.interval,
+        )
         return _normalise_price_frame(pd.DataFrame(ticker_data["prices"]))
     raise HTTPException(
         status_code=400,
@@ -124,57 +264,20 @@ def _load_price_frame(
 
 
 @app.get("/api/ticker")
-def get_ticker_data(symbol: str, period: str = "1y", interval: str = "1d"):
+def get_ticker_data(
+    symbol: str,
+    period: str = "1y",
+    interval: str = "1d",
+) -> dict[str, Any]:
     """Fetch historical close prices for a symbol from Yahoo Finance."""
-    logger.info(f"Fetching history for: {symbol} (period={period}, interval={interval})")
     try:
-        ticker = yf.Ticker(symbol)
-        df = ticker.history(period=period, interval=interval)
-        if df.empty:
-            raise HTTPException(
-                status_code=404,
-                detail=f"No market data returned for symbol '{symbol}'. Verify the symbol name.",
-            )
-
-        df = df.reset_index()
-
-        date_col = None
-        for col in ["Date", "Datetime", "date", "datetime"]:
-            if col in df.columns:
-                date_col = col
-                break
-        if date_col is None:
-            date_col = df.columns[0]
-
-        df = df.rename(columns={date_col: "date", "Close": "close"})
-        df = df[["date", "close"]].copy()
-
-        df["date"] = pd.to_datetime(df["date"])
-        if df["date"].dt.tz is not None:
-            df["date"] = df["date"].dt.tz_localize(None)
-
-        df = df.dropna()
-        df = df[df["close"] > 0]
-
-        if df.empty:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Data retrieved for '{symbol}' contains no valid prices.",
-            )
-
-        date_format = "%Y-%m-%d %H:%M:%S" if interval.endswith("h") else "%Y-%m-%d"
-        records = []
-        for _, row in df.iterrows():
-            records.append(
-                {
-                    "date": row["date"].strftime(date_format),
-                    "close": float(row["close"]),
-                }
-            )
-        return {"symbol": symbol.upper(), "prices": records}
-
-    except HTTPException:
-        raise
+        return _fetch_yahoo_prices(
+            symbol=symbol, period=period, interval=interval
+        )
+    except TickerNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except TickerDataInvalidError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         logger.exception("Error fetching ticker %s", symbol)
         raise HTTPException(
@@ -184,15 +287,10 @@ def get_ticker_data(symbol: str, period: str = "1y", interval: str = "1d"):
 
 
 @app.post("/api/backtest")
-def execute_backtest(request: BacktestRequest):
+def execute_backtest(request: BacktestRequest) -> BacktestResponse:
     """Run a multi-strategy backtest on fetched or uploaded price data."""
     try:
-        price_frame = _load_price_frame(
-            prices=request.prices,
-            symbol=request.symbol,
-            period=request.period,
-            interval=request.interval,
-        )
+        price_frame = _load_price_frame(request)
         fee_rate = request.transaction_fee_percent / 100.0
         result = run_backtest(
             price_data=price_frame,
@@ -202,7 +300,7 @@ def execute_backtest(request: BacktestRequest):
             **request.strategy_params,
         )
 
-        return asdict(result)
+        return BacktestResponse.from_result(result)
 
     except HTTPException:
         raise
@@ -211,31 +309,16 @@ def execute_backtest(request: BacktestRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         logger.exception("Error running backtest")
-        raise HTTPException(status_code=500, detail=f"Backtester error: {exc}") from exc
-
-
-class OptimizeRequest(BaseModel):
-    """Request body for the parameter search endpoint."""
-
-    prices: list[PricePoint] | None = Field(default=None)
-    symbol: str | None = Field(default=None)
-    period: str = "1y"
-    interval: str = "1d"
-    starting_capital: float = 10000.0
-    transaction_fee_percent: float = 0.1
-    strategy_type: str = "sma"
+        raise HTTPException(
+            status_code=500, detail=f"Backtester error: {exc}"
+        ) from exc
 
 
 @app.post("/api/optimize")
-def optimize_strategy(request: OptimizeRequest):
-    """Run a parameter sweep grid search and return the top 5 parameter configurations."""
+def optimize_strategy(request: OptimizeRequest) -> OptimizeResponse:
+    """Run a parameter sweep and return the top five configurations."""
     try:
-        price_frame = _load_price_frame(
-            prices=request.prices,
-            symbol=request.symbol,
-            period=request.period,
-            interval=request.interval,
-        )
+        price_frame = _load_price_frame(request)
         fee_rate = request.transaction_fee_percent / 100.0
         best_runs = optimize_strategy_parameters(
             price_data=price_frame,
@@ -244,7 +327,10 @@ def optimize_strategy(request: OptimizeRequest):
             strategy_type=request.strategy_type,
         )
 
-        return {"strategy_type": request.strategy_type, "runs": best_runs}
+        return OptimizeResponse(
+            strategy_type=request.strategy_type,
+            runs=best_runs,
+        )
 
     except HTTPException:
         raise
@@ -253,13 +339,49 @@ def optimize_strategy(request: OptimizeRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         logger.exception("Error running optimization")
-        raise HTTPException(status_code=500, detail=f"Optimizer error: {exc}") from exc
+        raise HTTPException(
+            status_code=500, detail=f"Optimizer error: {exc}"
+        ) from exc
+
+
+class NoCacheStaticFiles(StaticFiles):
+    """Serve frontend assets without long-lived browser caching."""
+
+    _NO_CACHE = "no-store, no-cache, must-revalidate, max-age=0"
+
+    def is_not_modified(
+        self,
+        response_headers: Headers,
+        request_headers: Headers,
+    ) -> bool:
+        _ = (response_headers, request_headers)
+        return False
+
+    def file_response(
+        self,
+        full_path: str | os.PathLike[str],
+        stat_result: os.stat_result,
+        scope: Scope,
+        status_code: int = 200,
+    ) -> Response:
+        response = super().file_response(
+            full_path, stat_result, scope, status_code=status_code
+        )
+        response.headers["Cache-Control"] = self._NO_CACHE
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
 
 
 try:
-    app.mount("/", StaticFiles(directory="frontend", html=True), name="static")
+    app.mount(
+        "/",
+        NoCacheStaticFiles(directory="frontend", html=True),
+        name="static",
+    )
 except Exception as exc:
     logger.warning(
-        "Could not mount static files directory: %s. API endpoints remain active.",
+        "Could not mount static files directory: %s. "
+        "API endpoints remain active.",
         exc,
     )
