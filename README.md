@@ -11,7 +11,7 @@ does not connect to a broker and it does not place real trades.
 
 - Load historical prices from Yahoo Finance or from a CSV file.
 - Run backtests with a configurable starting balance and transaction fee.
-- Compare two rule-based strategies:
+- Compare rule-based strategies:
   - Simple Moving Average (SMA)
   - Exponential Moving Average (EMA)
 - Show performance metrics:
@@ -41,7 +41,9 @@ does not connect to a broker and it does not place real trades.
 │   ├── index.html                 Dashboard markup
 │   ├── strategy-config.js         Strategy form and legend mapping
 │   └── styles.css                 Dashboard styling
-├── tests/                         Unit and API tests
+├── tests/
+│   ├── fixtures/                  Smoke test payloads for devenv test
+│   └── …                          Unit and API tests
 ├── trading_backtester/
 │   ├── api.py                     FastAPI routes
 │   ├── backtester.py              Trade simulation and optimizer
@@ -50,35 +52,68 @@ does not connect to a broker and it does not place real trades.
 │   ├── models.py                  Shared dataclasses and enums
 │   └── strategy.py                Indicators and signal generation
 ├── main.py                        Thin root entry point
-├── requirements.txt
+├── .envrc                         direnv entry (loads devenv)
+├── devenv.nix                     Isolated dev environment (Nix + UV)
+├── devenv.yaml                    devenv inputs
+├── pyproject.toml                 Python dependencies (UV)
+├── ruff.toml                      Lint and format rules
+├── ty.toml                        Type checker config
+├── uv.lock                        Locked Python dependencies
 └── pytest.ini
 ```
 
 ## Setup
 
-```bash
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-## Run the Dashboard
+Requires [devenv](https://devenv.sh/getting-started/) and [Nix](https://nixos.org/download/).
+All Python tooling runs through devenv — do not use bare `uv`, `pip`, or host Python.
 
 ```bash
-python -m trading_backtester.main --server
+devenv allow          # once, trust this project
+direnv allow          # once, auto-load env when you cd into the repo
 ```
+
+Enter the environment (syncs Python deps via UV on first entry):
+
+```bash
+devenv shell
+```
+
+With direnv allowed, `cd` into the repo loads the same environment automatically.
+Process settings (`HOST`, `PORT`) live in `devenv.nix` — no `.env` file needed.
+
+## Run the App
+
+MacroSignal is a single process (`app`) that serves the API and frontend.
+
+Development (hot reload on Python changes):
+
+```bash
+devenv up
+```
+
+Production-style process (localhost only, no reload):
+
+```bash
+ENV=prod devenv --no-tui up app
+```
+
+On the prod server, set `ENV=prod` in the systemd unit (or export it before `devenv up`).
 
 Then open:
 
 ```text
-http://127.0.0.1:8000/
+http://127.0.0.1:41793/
 ```
 
 ## Run a CLI Backtest
 
+From the devenv environment (`devenv shell` or direnv):
+
 ```bash
 python -m trading_backtester.main data/sample_prices.csv
 ```
+
+(`python` here is the devenv-managed interpreter, not system Python.)
 
 The CSV file must contain at least these columns:
 
@@ -88,11 +123,32 @@ date,close
 2024-01-02,101.00
 ```
 
-## Tests
+## Development
+
+On first `devenv shell`, a pre-push hook is installed. Every `git push` runs
+full QA via `devenv test` (format, lint, typecheck, pytest, integration smoke).
+
+Run the same QA manually:
 
 ```bash
-pytest
+devenv test
 ```
+
+`devenv test` runs the `qa:*` task graph natively via `devenv:enterTest` and
+`devenv:processes:app@ready` dependencies — no shell script orchestration.
+
+Individual QA steps:
+
+```bash
+devenv tasks run qa:format
+devenv tasks run qa:lint
+devenv tasks run qa:typecheck
+devenv tasks run qa:pytest
+devenv tasks run qa:smoke
+devenv tasks run qa            # all qa:* tasks
+```
+
+## Tests
 
 The tests cover CSV validation, indicator calculations, signal generation,
 backtest accounting, optimizer output, and the API endpoints.
@@ -127,6 +183,3 @@ Not included:
 - order book or intraday execution simulation
 - portfolio allocation across several assets
 - news, macro, or geopolitical event analysis
-
-
-test

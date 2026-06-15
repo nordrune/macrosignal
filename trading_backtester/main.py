@@ -1,6 +1,7 @@
 """Command-line interface for the trading backtester."""
 
 import argparse
+import os
 import sys
 from collections.abc import Sequence
 
@@ -11,7 +12,9 @@ from trading_backtester.data_loader import load_price_data
 def build_parser() -> argparse.ArgumentParser:
     """Build the command-line argument parser."""
     parser = argparse.ArgumentParser(
-        description="Run a trading backtest on CSV price data or launch the web server.",
+        description=(
+            "Run a trading backtest on CSV price data or launch the web server."
+        ),
     )
     parser.add_argument(
         "csv_file",
@@ -28,11 +31,12 @@ def build_parser() -> argparse.ArgumentParser:
         default="127.0.0.1",
         help="Host address to bind the server to (default: 127.0.0.1).",
     )
+    default_port = int(os.environ.get("PORT", "41793"))
     parser.add_argument(
         "--port",
         type=int,
-        default=8000,
-        help="Port to run the web server on (default: 8000).",
+        default=default_port,
+        help="Port to run the web server on (default: $PORT or 41793).",
     )
     return parser
 
@@ -51,13 +55,23 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.server:
         import uvicorn
-        print(f"Starting MacroSignal dashboard on http://{args.host}:{args.port}")
-        uvicorn.run("trading_backtester.api:app", host=args.host, port=args.port, log_level="info")
+
+        print(
+            f"Starting MacroSignal dashboard on http://{args.host}:{args.port}"
+        )
+        uvicorn.run(
+            "trading_backtester.api:app",
+            host=args.host,
+            port=args.port,
+            log_level="info",
+        )
         return 0
 
     if not args.csv_file:
         parser.print_usage(sys.stderr)
-        print("Error: must specify csv_file or run with --server", file=sys.stderr)
+        print(
+            "Error: must specify csv_file or run with --server", file=sys.stderr
+        )
         return 1
 
     try:
