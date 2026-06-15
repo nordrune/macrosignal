@@ -3,7 +3,7 @@
 	import type { StringKey } from '$lib/i18n';
 	import type { Interval } from '$lib/types';
 	import { INTERVALS } from '$lib/types';
-	import { cn } from '$lib/utils';
+	import { NATIVE_SELECT_CLASS } from '$lib/theme';
 
 	let {
 		value = $bindable(),
@@ -15,14 +15,9 @@
 
 	const i18n = getI18n();
 	const intervalKey = (iv: Interval): StringKey => `interval.${iv}` as StringKey;
-
-	const selectClass = cn(
-		'border-input bg-background h-8 w-full rounded-lg border px-2.5 text-sm',
-		'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 outline-none'
-	);
 </script>
 
-<select class={selectClass} bind:value {onchange}>
+<select class={NATIVE_SELECT_CLASS} bind:value {onchange}>
 	{#each INTERVALS as iv (iv)}
 		<option value={iv}>{i18n.t(intervalKey(iv))}</option>
 	{/each}

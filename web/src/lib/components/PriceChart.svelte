@@ -1,10 +1,17 @@
 <script lang="ts">
-	// ponytail: canvas charts — no chart library dependency
+	// ponytail: canvas charts, no chart library dependency
 	import { browser } from '$app/environment';
 	import type { CapitalPoint, SeriesPoint, Trade } from '$lib/api';
 	import { formatCurrency } from '$lib/formatters';
 	import { getI18n } from '$lib/i18n';
 	import type { StrategyType } from '$lib/strategy';
+	import {
+		CHART_RANGE_ALPHA_FALLBACK,
+		CSS_VAR,
+		chartAlphaColor,
+		getChartColors,
+		withAlpha
+	} from '$lib/theme';
 
 	type ChartGeom = {
 		xForIdx: (idx: number) => number;
@@ -44,12 +51,13 @@
 	let chartGeom = $state<ChartGeom | null>(null);
 	let subChartGeom = $state<ChartGeom | null>(null);
 	let animationFrame: number | null = null;
+	let hoverIndex = $state<number | null>(null);
 
 	function chartMargin() {
 		if (!browser) return { top: 12, right: 16, bottom: 12, left: 54 };
 		const narrow = window.innerWidth < 640;
 		return narrow
-			? { top: 10, right: 8, bottom: 10, left: 42 }
+			? { top: 8, right: 2, bottom: 8, left: 30 }
 			: { top: 12, right: 16, bottom: 12, left: 54 };
 	}
 
@@ -91,9 +99,10 @@
 		formatFn: (v: number) => string = (v) => v.toFixed(0)
 	) {
 		const narrow = browser && window.innerWidth < 640;
-		ctx.strokeStyle = '#242a3c';
+		const colors = getChartColors();
+		ctx.strokeStyle = colors.grid;
 		ctx.lineWidth = 1;
-		ctx.fillStyle = '#9ca3af';
+		ctx.fillStyle = colors.label;
 		ctx.font = narrow ? '8px system-ui' : '9px system-ui';
 		ctx.textAlign = 'right';
 
@@ -150,6 +159,7 @@
 		const data = seriesData;
 		if (!priceCanvas || !indicatorCanvas || !data.length) return;
 
+		const colors = getChartColors();
 		const len = data.length;
 		const closeVals = data.map((d, i) => ({ index: i, value: d.close }));
 		let mainVals = closeVals.map((v) => v.value);
@@ -185,7 +195,7 @@
 			closeVals,
 			priceHelpers.xForIdx,
 			priceHelpers.yForVal,
-			'#f3f4f6',
+			colors.price,
 			2.2,
 			lineProgress
 		);
@@ -196,7 +206,7 @@
 			maVals,
 			priceHelpers.xForIdx,
 			priceHelpers.yForVal,
-			'#00e6c3',
+			colors.ma,
 			1.8,
 			lineProgress
 		);
@@ -212,7 +222,10 @@
 			if (entryIdx !== -1 && exitIdx !== -1) {
 				const xStart = priceHelpers.xForIdx(entryIdx);
 				const xEnd = priceHelpers.xForIdx(exitIdx);
-				priceHelpers.ctx.fillStyle = 'rgba(124, 58, 237, 0.07)';
+				priceHelpers.ctx.fillStyle = chartAlphaColor(
+					CSS_VAR.chartRange,
+					CHART_RANGE_ALPHA_FALLBACK
+				);
 				priceHelpers.ctx.fillRect(
 					xStart,
 					priceHelpers.margin.top,
@@ -232,18 +245,19 @@
 
 			priceHelpers.ctx.beginPath();
 			priceHelpers.ctx.arc(x, y, isSelected ? 7 : 5, 0, 2 * Math.PI);
-			priceHelpers.ctx.fillStyle = trade.type === 'buy' ? '#10b981' : '#f43f5e';
+			priceHelpers.ctx.fillStyle = trade.type === 'buy' ? colors.buy : colors.sell;
 			priceHelpers.ctx.fill();
-			priceHelpers.ctx.strokeStyle = '#ffffff';
+			priceHelpers.ctx.strokeStyle = colors.markerStroke;
 			priceHelpers.ctx.lineWidth = 1.5;
 			priceHelpers.ctx.stroke();
 		});
 
-		if (selectedPointIndex !== null) {
-			const hx = priceHelpers.xForIdx(selectedPointIndex);
-			const hy = priceHelpers.yForVal(data[selectedPointIndex].close);
+		const activePointIndex = hoverIndex ?? selectedPointIndex;
+		if (activePointIndex !== null) {
+			const hx = priceHelpers.xForIdx(activePointIndex);
+			const hy = priceHelpers.yForVal(data[activePointIndex].close);
 
-			priceHelpers.ctx.strokeStyle = 'rgba(0, 230, 195, 0.3)';
+			priceHelpers.ctx.strokeStyle = withAlpha(colors.ma, 0.3);
 			priceHelpers.ctx.lineWidth = 1;
 			priceHelpers.ctx.beginPath();
 			priceHelpers.ctx.moveTo(hx, priceHelpers.margin.top);
@@ -252,9 +266,9 @@
 
 			priceHelpers.ctx.beginPath();
 			priceHelpers.ctx.arc(hx, hy, 5, 0, 2 * Math.PI);
-			priceHelpers.ctx.fillStyle = '#00e6c3';
+			priceHelpers.ctx.fillStyle = colors.ma;
 			priceHelpers.ctx.fill();
-			priceHelpers.ctx.strokeStyle = '#ffffff';
+			priceHelpers.ctx.strokeStyle = colors.markerStroke;
 			priceHelpers.ctx.lineWidth = 1.5;
 			priceHelpers.ctx.stroke();
 		}
@@ -284,19 +298,9 @@
 			(v) => `${v.toFixed(1)}%`
 		);
 
-		drawLine(
-			subHelpers.ctx,
-			ddVals,
-			subHelpers.xForIdx,
-			subHelpers.yForVal,
-			'#f43f5e',
-			1.5,
-			lineProgress
-		);
-
 		const limit = Math.max(1, Math.ceil(len * lineProgress));
 		const zeroY = subHelpers.yForVal(0);
-		subHelpers.ctx.fillStyle = 'rgba(244, 63, 94, 0.05)';
+		subHelpers.ctx.fillStyle = colors.drawdownFill;
 		subHelpers.ctx.beginPath();
 		subHelpers.ctx.moveTo(subHelpers.xForIdx(0), zeroY);
 		for (let i = 0; i < limit; i++) {
@@ -306,9 +310,19 @@
 		subHelpers.ctx.closePath();
 		subHelpers.ctx.fill();
 
-		if (selectedPointIndex !== null) {
-			const hx = subHelpers.xForIdx(selectedPointIndex);
-			subHelpers.ctx.strokeStyle = 'rgba(0, 230, 195, 0.3)';
+		drawLine(
+			subHelpers.ctx,
+			ddVals,
+			subHelpers.xForIdx,
+			subHelpers.yForVal,
+			colors.sell,
+			1.5,
+			lineProgress
+		);
+
+		if (activePointIndex !== null) {
+			const hx = subHelpers.xForIdx(activePointIndex);
+			subHelpers.ctx.strokeStyle = withAlpha(colors.ma, 0.3);
 			subHelpers.ctx.lineWidth = 1;
 			subHelpers.ctx.beginPath();
 			subHelpers.ctx.moveTo(hx, subHelpers.margin.top);
@@ -372,31 +386,43 @@
 
 	function handlePointerMove(e: PointerEvent, geometry: ChartGeom | null) {
 		const idx = findNearestIndex(e.clientX, geometry);
-		if (idx !== null) {
+		if (idx === null) return;
+
+		if (idx !== hoverIndex) {
+			hoverIndex = idx;
 			onSelectPoint?.(idx);
-			positionTooltip(idx);
+			drawCharts(1);
 		}
+		positionTooltip(idx);
 	}
 
 	function handlePointerLeave() {
+		hoverIndex = null;
 		if (tooltipEl) tooltipEl.hidden = true;
 	}
 
-	// ponytail: canvas redraw tracks props — external canvas sync, not state mutation
+	// ponytail: animate only when chart data changes, not on hover/selection
 	$effect(() => {
 		if (!seriesData.length) return;
 		seriesData;
 		trades;
 		capitalHistory;
 		strategy;
-		selectedPointIndex;
-		selectedTradeIndex;
+		hoverIndex = null;
 		animateCharts();
+	});
+
+	// ponytail: trade selection redraws instantly, like main branch drawCharts(1)
+	$effect(() => {
+		if (!seriesData.length) return;
+		selectedTradeIndex;
+		drawCharts(1);
 	});
 
 	function handleResize() {
 		drawCharts(1);
-		if (selectedPointIndex !== null) positionTooltip(selectedPointIndex);
+		const idx = hoverIndex ?? selectedPointIndex;
+		if (idx !== null) positionTooltip(idx);
 	}
 </script>
 
@@ -404,7 +430,7 @@
 
 <div class="relative min-w-0 space-y-2">
 	<div
-		class="border-border bg-card/50 relative h-48 w-full min-w-0 overflow-hidden rounded-lg border sm:h-56 md:h-64"
+		class="border-border surface-card relative h-52 w-full min-w-0 overflow-hidden rounded-md border sm:h-56 sm:rounded-lg md:h-64"
 	>
 		<canvas
 			bind:this={priceCanvas}
@@ -419,13 +445,13 @@
 		></canvas>
 		<div
 			bind:this={tooltipEl}
-			class="border-border bg-popover pointer-events-none absolute z-10 hidden max-w-[calc(100%-1rem)] min-w-28 -translate-x-1/2 -translate-y-full rounded-md border px-2 py-1.5 text-xs shadow-md"
+			class="tooltip-surface pointer-events-none absolute z-10 hidden max-w-[calc(100%-1rem)] min-w-28 -translate-x-1/2 -translate-y-full rounded-md px-2 py-1.5 text-xs shadow-md"
 			hidden
 		></div>
 	</div>
 
 	<div
-		class="border-border bg-card/50 h-24 w-full min-w-0 overflow-hidden rounded-lg border sm:h-28"
+		class="border-border surface-card h-24 w-full min-w-0 overflow-hidden rounded-md border sm:h-28 sm:rounded-lg"
 	>
 		<canvas
 			bind:this={indicatorCanvas}
