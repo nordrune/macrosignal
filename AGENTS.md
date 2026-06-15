@@ -12,7 +12,7 @@ Repo: https://github.com/nordrune/macrosignal
 ## Global contracts
 
 - Python: UV + devenv only; run QA via `devenv test`
-- API routes: `GET /health`, `GET /api/ticker`, `POST /api/backtest`, `POST /api/optimize`
+- API routes: `GET /health`, `GET /api/ticker`, `POST /api/backtest`; `POST /api/optimize` archived (503)
 - DTOs live in `trading_backtester/dto.py` (msgspec); domain logic stays framework-free
 - Frontend: SvelteKit 2 in `web/`; Bun package manager; `svelte-adapter-bun` for prod
 - Dev: `devenv up` runs API (`:41793`) + SvelteKit (`:5173`); browser uses `:5173`
