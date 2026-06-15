@@ -6,15 +6,14 @@ export const DEFAULT_WINDOW = 20;
 
 export type StrategyLegend = {
 	label: string;
-	color: string;
 };
 
 const LEGEND_CONFIG: Record<StrategyType, StrategyLegend> = {
-	sma: { label: 'SMA', color: '#00e6c3' },
-	ema: { label: 'EMA', color: '#00e6c3' }
+	sma: { label: 'SMA' },
+	ema: { label: 'EMA' }
 };
 
-// ponytail: sma and ema share one window param — same backend shape
+// ponytail: sma and ema share one window param, same backend shape
 function parseWindow(value: string | number, fallback = DEFAULT_WINDOW): number {
 	const parsed = typeof value === 'number' ? value : parseInt(value, 10);
 	return Number.isFinite(parsed) ? parsed : fallback;

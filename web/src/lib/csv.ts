@@ -1,4 +1,4 @@
-/** CSV helpers — backend validates; this catches obvious issues early. */
+/** CSV helpers. Backend validates; this catches obvious issues early. */
 
 export type PricePoint = { date: string; close: number };
 
