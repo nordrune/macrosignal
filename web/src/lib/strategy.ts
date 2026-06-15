@@ -6,7 +6,6 @@ export const DEFAULT_WINDOW = 20;
 
 export type StrategyLegend = {
 	label: string;
-	labelKey?: string;
 	color: string;
 	showMain: boolean;
 	showBands: boolean;
@@ -28,11 +27,8 @@ export function getLegendConfig(strategy: StrategyType): StrategyLegend {
 }
 
 export function getStrategyParams(
-	strategy: StrategyType,
+	_strategy: StrategyType,
 	window: string | number
 ): Record<string, number> {
-	if (strategy === 'sma' || strategy === 'ema') {
-		return { window: parseWindow(window) };
-	}
-	return {};
+	return { window: parseWindow(window) };
 }

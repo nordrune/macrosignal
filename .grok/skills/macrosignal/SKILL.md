@@ -46,11 +46,20 @@ python -m trading_backtester.main data/sample_prices.csv
 - **Charts:** canvas in `PriceChart.svelte` — no chart library
 - **Docs:** DOX `AGENTS.md` tree only; no changelog prose in README
 
+## Known risks (premortem)
+
+- Default UX hits live Yahoo Finance — tests mock `/api/ticker`; smoke uses fixture prices
+- `devenv up` + `devenv test` conflict on port 41793 — kill `devenv up` first
+- `MAX_PRICE_POINTS` (10_000) caps custom CSV payloads server-side
+- Prod needs `API_ORIGIN` on Bun server — see `web/.env.example`
+- Open API if exposed publicly — educational scope only; no auth
+
 ## Deferred (do not implement unless asked)
 
 - PWA manifest (removed with legacy `frontend/`)
 - Excel/PDF export (CSV only in `export.ts`)
 - Granian prod API server
+- Yahoo price client cache / auto-run debounce to reduce refetches
 - Splitting `+page.svelte` into many components (only if user requests)
 
 ## Common tasks

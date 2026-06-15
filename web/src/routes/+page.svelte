@@ -21,7 +21,14 @@
 	} from '$lib/api';
 	import { SAMPLE_CSV, parseCsvText } from '$lib/csv';
 	import { exportCsv, type RunSnapshot } from '$lib/export';
-	import { formatCurrency, hasNumber } from '$lib/formatters';
+	import {
+		formatCurrency,
+		formatKeyValueParams,
+		hasNumber,
+		pnlClass,
+		signedCurrency,
+		signedPercent
+	} from '$lib/formatters';
 	import { getI18n } from '$lib/i18n';
 	import {
 		DEFAULT_WINDOW,
@@ -83,14 +90,8 @@
 		statusType = type;
 	}
 
-	function signedCurrency(value: number) {
-		const prefix = value > 0 ? '+' : '';
-		return `${prefix}${formatCurrency(value)}`;
-	}
-
-	function signedPercent(value: number) {
-		const prefix = value > 0 ? '+' : '';
-		return `${prefix}${value.toFixed(2)}%`;
+	function statusFromError(error: unknown): string {
+		return error instanceof Error ? error.message : i18n.t('error.backtest');
 	}
 
 	function scheduleAutoRun() {
@@ -134,8 +135,9 @@
 
 		try {
 			const { payload, strategyParams, capital, fee } = buildPayload();
+			const isApi = dataSource === 'api';
 
-			if (dataSource === 'api') {
+			if (isApi) {
 				activeTicker = payload.symbol ?? activeTicker;
 				activeUsesCsv = false;
 			} else {
@@ -149,11 +151,11 @@
 
 			result = response;
 			runSnapshot = {
-				dataSource: dataSource === 'api' ? i18n.t('source.yahoo') : i18n.t('source.csv'),
-				asset: dataSource === 'api' ? (payload.symbol ?? '-') : i18n.t('active.customCsv'),
-				period: dataSource === 'api' ? period : '-',
-				interval: dataSource === 'api' ? interval : '-',
-				strategy: i18n.t(strategy === 'sma' ? 'strategy.sma' : 'strategy.ema'),
+				dataSource: isApi ? i18n.t('source.yahoo') : i18n.t('source.csv'),
+				asset: isApi ? (payload.symbol ?? '-') : i18n.t('active.customCsv'),
+				period: isApi ? period : '-',
+				interval: isApi ? interval : '-',
+				strategy: i18n.t(`strategy.${strategy}` as 'strategy.sma'),
 				strategyType: strategy,
 				strategyParams,
 				startingCapital: capital,
@@ -168,7 +170,7 @@
 			setStatus(i18n.t('status.done'), 'success');
 		} catch (error) {
 			if (requestId !== activeRequestId) return;
-			setStatus(error instanceof Error ? error.message : i18n.t('error.backtest'), 'error');
+			setStatus(statusFromError(error), 'error');
 		} finally {
 			if (requestId === activeRequestId) isRunning = false;
 		}
@@ -185,7 +187,7 @@
 			optimizeRuns = response.runs.slice(0, 5);
 			setStatus(i18n.t('status.done'), 'success');
 		} catch (error) {
-			setStatus(error instanceof Error ? error.message : i18n.t('error.backtest'), 'error');
+			setStatus(statusFromError(error), 'error');
 		} finally {
 			isOptimizing = false;
 		}
@@ -221,12 +223,6 @@
 			selectedTradeIndex = tradeIdx;
 			selectedPointIndex = dataIdx;
 		}
-	}
-
-	function formatOptimizeParams(params: Record<string, number>) {
-		return Object.entries(params)
-			.map(([key, value]) => `${key}: ${value}`)
-			.join(', ');
 	}
 
 	// ponytail: one-shot initial backtest; onMount is fine (not a window listener)
@@ -392,13 +388,13 @@
 
 						<div class="space-y-2">
 							<Label class="flex items-center gap-1.5">
-								{strategy === 'sma' ? i18n.t('param.smaWindow') : i18n.t('param.emaWindow')}
+								{i18n.t(`param.${strategy}Window` as 'param.smaWindow')}
 								<Tooltip.Root>
 									<Tooltip.Trigger class="inline-flex">
 										<CircleHelpIcon class="text-muted-foreground size-3.5" />
 									</Tooltip.Trigger>
 									<Tooltip.Content>
-										{strategy === 'sma' ? i18n.t('param.smaTooltip') : i18n.t('param.emaTooltip')}
+										{i18n.t(`param.${strategy}Tooltip` as 'param.smaTooltip')}
 									</Tooltip.Content>
 								</Tooltip.Root>
 							</Label>
@@ -452,11 +448,7 @@
 								<Checkbox bind:checked={autoRun} />
 								{i18n.t('autorun.label')}
 							</label>
-							<Button
-								class="min-h-11 w-full sm:min-h-0"
-								disabled={isRunning}
-								onclick={() => runBacktest()}
-							>
+							<Button class="min-h-11 w-full sm:min-h-0" disabled={isRunning} onclick={runBacktest}>
 								<PlayIcon class="size-4" />
 								{i18n.t('action.run')}
 							</Button>
@@ -503,13 +495,9 @@
 										<Table.TableCell>{i + 1}</Table.TableCell>
 										<Table.TableCell
 											class="max-w-48 font-mono text-xs whitespace-nowrap sm:max-w-none"
-											>{formatOptimizeParams(run.params)}</Table.TableCell
+											>{formatKeyValueParams(run.params)}</Table.TableCell
 										>
-										<Table.TableCell
-											class={cn(
-												run.profit_loss_percent >= 0 ? 'text-emerald-400' : 'text-rose-400'
-											)}
-										>
+										<Table.TableCell class={pnlClass(run.profit_loss_percent)}>
 											{signedPercent(run.profit_loss_percent)}
 										</Table.TableCell>
 										<Table.TableCell>{run.sharpe_ratio.toFixed(2)}</Table.TableCell>
@@ -553,12 +541,7 @@
 							></Card.CardHeader
 						>
 						<Card.CardContent>
-							<p
-								class={cn(
-									'text-xl font-semibold',
-									result.profit_loss >= 0 ? 'text-emerald-400' : 'text-rose-400'
-								)}
-							>
+							<p class={cn('text-xl font-semibold', pnlClass(result.profit_loss))}>
 								{signedCurrency(result.profit_loss)}
 							</p>
 						</Card.CardContent>
@@ -569,12 +552,7 @@
 							></Card.CardHeader
 						>
 						<Card.CardContent>
-							<p
-								class={cn(
-									'text-xl font-semibold',
-									result.profit_loss_percent >= 0 ? 'text-emerald-400' : 'text-rose-400'
-								)}
-							>
+							<p class={cn('text-xl font-semibold', pnlClass(result.profit_loss_percent))}>
 								{signedPercent(result.profit_loss_percent)}
 							</p>
 						</Card.CardContent>
@@ -644,12 +622,7 @@
 							</Card.CardDescription>
 						</Card.CardHeader>
 						<Card.CardContent>
-							<p
-								class={cn(
-									'text-xl font-semibold',
-									result.buy_and_hold_return >= 0 ? 'text-emerald-400' : 'text-rose-400'
-								)}
-							>
+							<p class={cn('text-xl font-semibold', pnlClass(result.buy_and_hold_return))}>
 								{signedPercent(result.buy_and_hold_return)}
 							</p>
 						</Card.CardContent>

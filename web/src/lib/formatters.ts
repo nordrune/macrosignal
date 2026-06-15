@@ -10,3 +10,25 @@ export function formatCurrency(value: number): string {
 export function hasNumber(value: unknown): boolean {
 	return value !== null && value !== undefined && Number.isFinite(Number(value));
 }
+
+export function signedCurrency(value: number): string {
+	const prefix = value > 0 ? '+' : '';
+	return `${prefix}${formatCurrency(value)}`;
+}
+
+export function signedPercent(value: number): string {
+	const prefix = value > 0 ? '+' : '';
+	return `${prefix}${value.toFixed(2)}%`;
+}
+
+export function pnlClass(value: number): string {
+	return value >= 0 ? 'text-emerald-400' : 'text-rose-400';
+}
+
+export function formatKeyValueParams(params: Record<string, number>): string {
+	return (
+		Object.entries(params)
+			.map(([key, value]) => `${key}: ${value}`)
+			.join(', ') || '-'
+	);
+}

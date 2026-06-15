@@ -2,9 +2,11 @@
 
 import json
 from pathlib import Path
+from unittest.mock import patch
 
+import pandas as pd
 from litestar.testing import TestClient
-from trading_backtester.api import app
+from trading_backtester.api import MAX_PRICE_POINTS, app
 
 FIXTURE = Path(__file__).parent / "fixtures" / "smoke_backtest_request.json"
 
@@ -33,3 +35,41 @@ def test_api_backtest_missing_source_returns_400():
         response = client.post("/api/backtest", json={"strategy_type": "sma"})
 
     assert response.status_code == 400
+
+
+def test_api_backtest_too_many_prices_returns_400():
+    prices = [
+        {"date": f"2024-01-{(i % 28) + 1:02d}", "close": 100.0}
+        for i in range(MAX_PRICE_POINTS + 1)
+    ]
+    with TestClient(app=app) as client:
+        response = client.post(
+            "/api/backtest",
+            json={"prices": prices, "strategy_type": "sma"},
+        )
+
+    assert response.status_code == 400
+
+
+def test_api_ticker_not_found_returns_404():
+    with patch("trading_backtester.api.yf.Ticker") as mock_ticker:
+        mock_ticker.return_value.history.return_value = pd.DataFrame()
+        with TestClient(app=app) as client:
+            response = client.get("/api/ticker", params={"symbol": "INVALID"})
+
+    assert response.status_code == 404
+
+
+def test_api_ticker_success():
+    index = pd.DatetimeIndex(pd.to_datetime(["2024-01-01", "2024-01-02"]))
+    index.name = "Date"
+    frame = pd.DataFrame({"Close": [42000.0, 42100.0]}, index=index)
+    with patch("trading_backtester.api.yf.Ticker") as mock_ticker:
+        mock_ticker.return_value.history.return_value = frame
+        with TestClient(app=app) as client:
+            response = client.get("/api/ticker", params={"symbol": "BTC-USD"})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["symbol"] == "BTC-USD"
+    assert len(data["prices"]) == 2
