@@ -31,6 +31,7 @@ in
     pkgs.bun
     pkgs.cacert
     pkgs.curl
+    pkgs.tokei
   ];
 
   languages.python = {
@@ -105,6 +106,15 @@ in
       language = "system";
       pass_filenames = false;
       stages = [ "pre-push" ];
+    };
+    tokei-stats = {
+      enable = true;
+      name = "tokei stats";
+      entry = "scripts/update-tokei.sh";
+      language = "system";
+      pass_filenames = false;
+      always_run = true;
+      stages = [ "pre-commit" ];
     };
   };
 

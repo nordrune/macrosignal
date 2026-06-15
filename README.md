@@ -41,3 +41,7 @@ devenv tasks run build:web     # production build
 Included: backtesting, virtual trades, fees, metrics, optimizer, CSV/Excel/PDF export, DE/EN UI.
 
 Not included: live trading, broker APIs, multi-asset portfolios.
+
+## Code stats
+
+Auto-updated on commit: [tokei.txt](tokei.txt)
