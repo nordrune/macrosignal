@@ -8,7 +8,7 @@ SvelteKit 2 dashboard (Svelte 5 runes, TypeScript strict). Bun toolchain. Served
 
 | Path                                                                      | Role                                                                   |
 | ------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `src/routes/+page.svelte`                                                 | Main dashboard (settings, results, optimizer)                          |
+| `src/routes/+page.svelte`                                                 | Main dashboard (settings, results; optimizer UI archived)              |
 | `src/routes/+layout.svelte`                                               | Shell, i18n context, PWA meta (dark-only; no theme toggle)             |
 | `src/app.html`                                                            | Fixed `class="dark"` shell                                             |
 | `src/app.css`                                                             | Tokens, glass surfaces, skeleton, native-select styles                 |

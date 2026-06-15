@@ -22,6 +22,7 @@ Python package: price loading, strategy signals, backtest simulation, Litestar H
 - POST routes return HTTP 200 (not Litestar default 201)
 - Price source: either `prices[]` or `symbol` + Yahoo fetch
 - Price frames: `polars.DataFrame` with `date` + `close`; yfinance boundary extracts rows without importing pandas
+- Parameter optimizer: archived (`OPTIMIZER_ENABLED = False` in `api.py`); grid search code kept in `backtester.py`
 - CLI CSV path must remain unchanged for `python -m trading_backtester.main`
 
 ## Work guidance

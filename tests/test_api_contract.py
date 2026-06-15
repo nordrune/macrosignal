@@ -106,11 +106,11 @@ def test_api_backtest_response_full_schema():
         assert key in capital_point
 
 
-def test_api_optimize_missing_source_returns_400():
+def test_api_optimize_archived_returns_503():
     with TestClient(app=app) as client:
         response = client.post("/api/optimize", json={"strategy_type": "sma"})
 
-    assert response.status_code == 400
+    assert response.status_code == 503
 
 
 def test_api_ticker_success():

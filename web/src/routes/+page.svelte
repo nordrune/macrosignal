@@ -114,6 +114,8 @@
 
 	const TICKER_AUTORUN_MS = 800;
 	const DEFAULT_AUTORUN_MS = 350;
+	// ponytail: archived optimizer panel; set true to restore UI and auto-run hook
+	const OPTIMIZER_ENABLED = false;
 
 	const legend = $derived(getLegendConfig(strategy));
 	const selectedPoint = $derived(
@@ -138,7 +140,7 @@
 
 	async function runAutoUpdate() {
 		await runBacktest();
-		if (autoRun) await runOptimize();
+		if (autoRun && OPTIMIZER_ENABLED) await runOptimize();
 	}
 
 	function scheduleAutoRun(delayMs = DEFAULT_AUTORUN_MS) {
@@ -601,75 +603,81 @@
 						{i18n.t('action.run')}
 					</Button>
 
-					<div class="border-border space-y-3 border-t pt-4">
-						<div class="flex items-center justify-between gap-2">
-							<h3
-								class="text-muted-foreground flex min-h-8 items-center gap-2 text-sm leading-tight font-medium"
-							>
-								<SparklesIcon class="size-3.5 shrink-0" />
-								<span class="line-clamp-2">{i18n.t('optimizer.title')}</span>
-							</h3>
-							<Button
-								variant="outline"
-								size="sm"
-								class="shrink-0 whitespace-nowrap"
-								disabled={isOptimizing && optimizeRuns.length === 0}
-								onclick={runOptimize}
-							>
+					<!-- ponytail: archived — parameter optimizer UI; restore with OPTIMIZER_ENABLED -->
+					{#if OPTIMIZER_ENABLED}
+						<div class="border-border space-y-3 border-t pt-4">
+							<div class="flex items-center justify-between gap-2">
+								<h3
+									class="text-muted-foreground flex min-h-8 items-center gap-2 text-sm leading-tight font-medium"
+								>
+									<SparklesIcon class="size-3.5 shrink-0" />
+									<span class="line-clamp-2">{i18n.t('optimizer.title')}</span>
+								</h3>
+								<Button
+									variant="outline"
+									size="sm"
+									class="shrink-0 whitespace-nowrap"
+									disabled={isOptimizing && optimizeRuns.length === 0}
+									onclick={runOptimize}
+								>
+									{#if isOptimizing}
+										<Loader2Icon class="size-3.5 animate-spin" />
+									{/if}
+									{i18n.t('optimizer.run')}
+								</Button>
+							</div>
+							{#if optimizeRuns.length === 0}
 								{#if isOptimizing}
-									<Loader2Icon class="size-3.5 animate-spin" />
+									<TableSkeleton columns={3} rows={5} />
+								{:else}
+									<div class="flex min-h-52 items-center">
+										<p class="text-muted-foreground text-xs">{i18n.t('optimizer.empty')}</p>
+									</div>
 								{/if}
-								{i18n.t('optimizer.run')}
-							</Button>
-						</div>
-						{#if optimizeRuns.length === 0}
-							{#if isOptimizing}
-								<TableSkeleton columns={3} rows={5} />
 							{:else}
-								<div class="flex min-h-52 items-center">
-									<p class="text-muted-foreground text-xs">{i18n.t('optimizer.empty')}</p>
+								<div class="relative overflow-hidden rounded-lg">
+									<div class="refresh-pending overflow-x-auto" data-pending={isOptimizingRefresh}>
+										<Table.Table>
+											<Table.TableHeader>
+												<Table.TableRow>
+													<Table.TableHead class="text-xs">#</Table.TableHead>
+													<Table.TableHead class="text-xs"
+														>{i18n.t('optimizer.params')}</Table.TableHead
+													>
+													<Table.TableHead class="text-xs"
+														>{i18n.t('optimizer.return')}</Table.TableHead
+													>
+												</Table.TableRow>
+											</Table.TableHeader>
+											<Table.TableBody>
+												{#each optimizeRuns as run, i (i)}
+													<Table.TableRow>
+														<Table.TableCell class="text-xs">{i + 1}</Table.TableCell>
+														<Table.TableCell class="font-mono text-xs"
+															>{formatKeyValueParams(run.params)}</Table.TableCell
+														>
+														<Table.TableCell
+															class={cn(
+																STABLE_CLASS.value,
+																'text-xs whitespace-nowrap',
+																pnlClass(run.profit_loss_percent)
+															)}
+														>
+															{signedPercent(run.profit_loss_percent)}
+														</Table.TableCell>
+													</Table.TableRow>
+												{/each}
+											</Table.TableBody>
+										</Table.Table>
+									</div>
+									<RefreshOverlay
+										active={isOptimizingRefresh}
+										label={i18n.t('optimizer.running')}
+									/>
 								</div>
 							{/if}
-						{:else}
-							<div class="relative overflow-hidden rounded-lg">
-								<div class="refresh-pending overflow-x-auto" data-pending={isOptimizingRefresh}>
-									<Table.Table>
-										<Table.TableHeader>
-											<Table.TableRow>
-												<Table.TableHead class="text-xs">#</Table.TableHead>
-												<Table.TableHead class="text-xs"
-													>{i18n.t('optimizer.params')}</Table.TableHead
-												>
-												<Table.TableHead class="text-xs"
-													>{i18n.t('optimizer.return')}</Table.TableHead
-												>
-											</Table.TableRow>
-										</Table.TableHeader>
-										<Table.TableBody>
-											{#each optimizeRuns as run, i (i)}
-												<Table.TableRow>
-													<Table.TableCell class="text-xs">{i + 1}</Table.TableCell>
-													<Table.TableCell class="font-mono text-xs"
-														>{formatKeyValueParams(run.params)}</Table.TableCell
-													>
-													<Table.TableCell
-														class={cn(
-															STABLE_CLASS.value,
-															'text-xs whitespace-nowrap',
-															pnlClass(run.profit_loss_percent)
-														)}
-													>
-														{signedPercent(run.profit_loss_percent)}
-													</Table.TableCell>
-												</Table.TableRow>
-											{/each}
-										</Table.TableBody>
-									</Table.Table>
-								</div>
-								<RefreshOverlay active={isOptimizingRefresh} label={i18n.t('optimizer.running')} />
-							</div>
-						{/if}
-					</div>
+						</div>
+					{/if}
 
 					<div class={STABLE_CLASS.status} role="status" aria-live="polite">
 						{#if statusMessage}

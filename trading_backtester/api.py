@@ -32,6 +32,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 MAX_PRICE_POINTS = 10_000
+# ponytail: archived optimizer API; set OPTIMIZER_ENABLED True to restore route
+OPTIMIZER_ENABLED = False
 
 
 class TickerNotFoundError(ValueError):
@@ -249,6 +251,11 @@ async def execute_backtest(data: BacktestRequest) -> BacktestResponse:
 @post("/api/optimize", status_code=HTTP_200_OK)
 async def optimize_strategy(data: OptimizeRequest) -> OptimizeResponse:
     """Run a parameter sweep and return the top five configurations."""
+    if not OPTIMIZER_ENABLED:
+        raise HTTPException(
+            status_code=503,
+            detail="Parameter optimizer is archived and temporarily disabled.",
+        )
     try:
         price_frame = _load_price_frame(data)
         fee_rate = data.transaction_fee_percent / 100.0
