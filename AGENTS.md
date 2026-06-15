@@ -6,7 +6,8 @@
 ## Project
 
 MacroSignal: Litestar API + SvelteKit/Bun dashboard for trading backtests.
-Educational tool; no broker integration.
+Educational tool; no broker integration. License: AGPL-3.0-or-later ([LICENSE](LICENSE)).
+Repo: https://github.com/nordrune/macrosignal
 
 ## Global contracts
 

@@ -156,7 +156,7 @@ in
           -H "Content-Type: application/json" \
           -d @tests/fixtures/smoke_backtest_request.json \
           | grep -q "end_capital"
-        curl -sf http://127.0.0.1:${toString webPort}/ | grep -q "MacroSignal"
+        curl -sf http://127.0.0.1:${toString webPort}/ | grep -q "github.com/nordrune/macrosignal"
       '';
       after = [
         "qa:pytest"

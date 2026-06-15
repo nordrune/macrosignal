@@ -37,6 +37,7 @@
 		type StrategyType
 	} from '$lib/strategy';
 	import type { DataSource, Interval, Period, StatusType } from '$lib/types';
+	import { REPO_URL } from '$lib/site';
 	import { cn } from '$lib/utils';
 	import { onMount } from 'svelte';
 	import CircleHelpIcon from '@lucide/svelte/icons/circle-help';
@@ -790,9 +791,24 @@
 		</main>
 
 		<footer
-			class="border-border text-muted-foreground border-t px-4 py-6 text-center text-sm sm:px-6"
+			class="border-border text-muted-foreground space-y-2 border-t px-4 py-6 text-center text-sm sm:px-6"
 		>
-			{i18n.t('footer')}
+			<p>{i18n.t('footer.disclaimer')}</p>
+			<p class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+				<a
+					href={REPO_URL}
+					class="text-primary hover:underline"
+					target="_blank"
+					rel="noopener noreferrer">{i18n.t('footer.source')}</a
+				>
+				<span aria-hidden="true">·</span>
+				<a
+					href="{REPO_URL}/blob/main/LICENSE"
+					class="text-primary hover:underline"
+					target="_blank"
+					rel="noopener noreferrer">{i18n.t('footer.license')}</a
+				>
+			</p>
 		</footer>
 	</div>
 </Tooltip.TooltipProvider>

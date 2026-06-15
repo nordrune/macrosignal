@@ -7,13 +7,11 @@ export const DEFAULT_WINDOW = 20;
 export type StrategyLegend = {
 	label: string;
 	color: string;
-	showMain: boolean;
-	showBands: boolean;
 };
 
 const LEGEND_CONFIG: Record<StrategyType, StrategyLegend> = {
-	sma: { label: 'SMA', color: '#00e6c3', showMain: true, showBands: false },
-	ema: { label: 'EMA', color: '#00e6c3', showMain: true, showBands: false }
+	sma: { label: 'SMA', color: '#00e6c3' },
+	ema: { label: 'EMA', color: '#00e6c3' }
 };
 
 // ponytail: sma and ema share one window param — same backend shape
