@@ -1,5 +1,6 @@
 /* Theme variables */
 :root {
+  color-scheme: dark;
   --bg-app: #08090d;
   --bg-surface: #11131a;
   --bg-card: #171b26;
