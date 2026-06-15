@@ -2,12 +2,12 @@
 
 from pathlib import Path
 
-import pandas as pd
+import polars as pl
 
 REQUIRED_COLUMNS = {"date", "close"}
 
 
-def load_price_data(csv_path: str | Path) -> pd.DataFrame:
+def load_price_data(csv_path: str | Path) -> pl.DataFrame:
     """Load historical prices from a CSV file.
 
     The returned data frame contains validated ``date`` and ``close`` columns,
@@ -18,7 +18,7 @@ def load_price_data(csv_path: str | Path) -> pd.DataFrame:
         csv_path: Path to a CSV file containing at least ``date`` and ``close``.
 
     Returns:
-        A validated pandas data frame with ``date`` and ``close`` columns.
+        A validated polars data frame with ``date`` and ``close`` columns.
 
     Raises:
         FileNotFoundError: If the CSV file does not exist.
@@ -32,29 +32,35 @@ def load_price_data(csv_path: str | Path) -> pd.DataFrame:
         raise ValueError(f"CSV path is not a file: {path}")
 
     try:
-        raw_data = pd.read_csv(path)
-    except pd.errors.EmptyDataError as exc:
+        raw_data = pl.read_csv(path, infer_schema_length=10_000)
+    except pl.exceptions.NoDataError as exc:
         raise ValueError("CSV file is empty.") from exc
-    except pd.errors.ParserError as exc:
+    except Exception as exc:
         raise ValueError("CSV file could not be parsed.") from exc
+
+    if raw_data.height == 0 and not raw_data.columns:
+        raise ValueError("CSV file is empty.")
 
     missing_columns = REQUIRED_COLUMNS.difference(raw_data.columns)
     if missing_columns:
         missing = ", ".join(sorted(missing_columns))
         raise ValueError(f"CSV file is missing required columns: {missing}")
 
-    price_data = raw_data.loc[:, ["date", "close"]].copy()
-    price_data["date"] = pd.to_datetime(price_data["date"], errors="coerce")
-    price_data["close"] = pd.to_numeric(price_data["close"], errors="coerce")
-
-    valid_rows = (
-        price_data["date"].notna()
-        & price_data["close"].notna()
-        & (price_data["close"] > 0)
+    price_data = (
+        raw_data.select("date", "close")
+        .with_columns(
+            pl.col("date").str.to_datetime(strict=False),
+            pl.col("close").cast(pl.Float64, strict=False),
+        )
+        .filter(
+            pl.col("date").is_not_null()
+            & pl.col("close").is_not_null()
+            & (pl.col("close") > 0)
+        )
+        .sort("date")
     )
-    price_data = price_data.loc[valid_rows].copy()
 
-    if price_data.empty:
+    if price_data.is_empty():
         raise ValueError("CSV file contains no valid price rows.")
 
-    return price_data.sort_values("date").reset_index(drop=True)
+    return price_data

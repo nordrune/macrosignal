@@ -1,6 +1,6 @@
 """Tests for CSV loading and validation."""
 
-import pandas as pd
+import polars as pl
 import pytest
 from trading_backtester.data_loader import load_price_data
 
@@ -16,7 +16,9 @@ def test_load_price_data_with_valid_csv(tmp_path):
     price_data = load_price_data(csv_file)
 
     assert list(price_data["close"]) == [100.00, 101.25, 102.50]
-    assert pd.api.types.is_datetime64_any_dtype(price_data["date"])
+    assert price_data.schema["date"] == pl.Datetime(
+        time_unit="us", time_zone=None
+    )
 
 
 def test_load_price_data_rejects_missing_required_columns(tmp_path):

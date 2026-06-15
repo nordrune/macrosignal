@@ -6,9 +6,10 @@ from the core backtester so the simulation can also be used from the CLI.
 """
 
 import logging
+from datetime import datetime
 from typing import Any, NoReturn
 
-import pandas as pd
+import polars as pl
 import yfinance as yf
 from litestar import Litestar, get, post
 from litestar.exceptions import HTTPException
@@ -41,31 +42,41 @@ class TickerDataInvalidError(ValueError):
     """Raised when fetched ticker data has no usable close prices."""
 
 
-def _normalise_price_frame(data: pd.DataFrame) -> pd.DataFrame:
+def _normalise_price_frame(data: pl.DataFrame) -> pl.DataFrame:
     """Validate and sort price data before passing it into the backtester."""
-    if data.empty:
+    if data.is_empty():
         raise ValueError("Price data must contain at least one row.")
 
-    frame = data.loc[:, ["date", "close"]].copy()
-    frame["date"] = pd.to_datetime(frame["date"])
-    frame["close"] = pd.to_numeric(frame["close"])
-    frame = frame.dropna()
-    frame = frame[frame["close"] > 0]
+    date_expr = (
+        pl.col("date").str.to_datetime(strict=False)
+        if data.schema["date"] == pl.Utf8
+        else pl.col("date").cast(pl.Datetime, strict=False)
+    )
+    frame = (
+        data.select("date", "close")
+        .with_columns(
+            date_expr,
+            pl.col("close").cast(pl.Float64, strict=False),
+        )
+        .drop_nulls()
+        .filter(pl.col("close") > 0)
+        .sort("date")
+    )
 
-    if frame.empty:
+    if frame.is_empty():
         raise ValueError("Price data contains no valid positive close prices.")
 
-    return frame.sort_values("date").reset_index(drop=True)
+    return frame
 
 
-def _frame_from_price_points(prices: list[PricePoint]) -> pd.DataFrame:
-    """Convert uploaded or pasted price points to a validated pandas frame."""
+def _frame_from_price_points(prices: list[PricePoint]) -> pl.DataFrame:
+    """Convert uploaded or pasted price points to a validated polars frame."""
     if len(prices) > MAX_PRICE_POINTS:
         raise ValueError(
             f"At most {MAX_PRICE_POINTS} price points allowed per request."
         )
     rows = [{"date": point.date, "close": point.close} for point in prices]
-    return _normalise_price_frame(pd.DataFrame(rows))
+    return _normalise_price_frame(pl.DataFrame(rows))
 
 
 def _handle_route_error(
@@ -87,6 +98,18 @@ def _handle_route_error(
     ) from exc
 
 
+def _naive_datetime(value: object) -> datetime:
+    """Strip timezone info from yfinance timestamps without importing pandas."""
+    converter = getattr(value, "to_pydatetime", None)
+    if callable(converter):
+        value = converter()
+    if isinstance(value, datetime) and value.tzinfo is not None:
+        return value.replace(tzinfo=None)
+    if not isinstance(value, datetime):
+        raise TypeError(f"Expected datetime-like value, got {type(value)!r}")
+    return value
+
+
 def _fetch_yahoo_prices(
     symbol: str,
     period: str = "1y",
@@ -105,53 +128,56 @@ def _fetch_yahoo_prices(
         interval,
     )
     ticker = yf.Ticker(symbol)
-    df = ticker.history(period=period, interval=interval)
-    if df.empty:
+    # ponytail: yfinance returns pandas; extract rows, no pandas import
+    hist = ticker.history(period=period, interval=interval)
+    if hist.empty:
         raise TickerNotFoundError(
             f"No market data returned for symbol '{symbol}'. "
             "Verify the symbol name."
         )
 
-    df = df.reset_index()
-
+    raw = hist.reset_index()
     date_col = None
     for col in ["Date", "Datetime", "date", "datetime"]:
-        if col in df.columns:
+        if col in raw.columns:
             date_col = col
             break
     if date_col is None:
-        date_col = df.columns[0]
+        date_col = raw.columns[0]
 
-    df = df.rename(columns={date_col: "date", "Close": "close"})
-    df = df[["date", "close"]].copy()
-
-    df["date"] = pd.to_datetime(df["date"])
-    if df["date"].dt.tz is not None:
-        df["date"] = df["date"].dt.tz_localize(None)
-
-    df = df.dropna()
-    df = df[df["close"] > 0]
-
-    if df.empty:
+    if "Close" not in raw.columns:
         raise TickerDataInvalidError(
             f"Data retrieved for '{symbol}' contains no valid prices."
         )
 
     date_format = "%Y-%m-%d %H:%M:%S" if interval.endswith("h") else "%Y-%m-%d"
-    records = []
-    for _, row in df.iterrows():
+    records: list[dict[str, object]] = []
+    for _, row in raw.iterrows():
+        close = row["Close"]
+        if close != close:
+            continue
+        close_value = float(close)
+        if close_value <= 0:
+            continue
+        date_value = _naive_datetime(row[date_col])
         records.append(
             {
-                "date": row["date"].strftime(date_format),
-                "close": float(row["close"]),
+                "date": date_value.strftime(date_format),
+                "close": close_value,
             }
         )
+
+    if not records:
+        raise TickerDataInvalidError(
+            f"Data retrieved for '{symbol}' contains no valid prices."
+        )
+
     if len(records) > MAX_PRICE_POINTS:
         records = records[-MAX_PRICE_POINTS:]
     return {"symbol": symbol.upper(), "prices": records}
 
 
-def _load_price_frame(source: PriceSourceRequest) -> pd.DataFrame:
+def _load_price_frame(source: PriceSourceRequest) -> pl.DataFrame:
     """Load prices from custom points or Yahoo Finance, then validate them."""
     if source.prices:
         return _frame_from_price_points(source.prices)
@@ -161,7 +187,7 @@ def _load_price_frame(source: PriceSourceRequest) -> pd.DataFrame:
             period=source.period,
             interval=source.interval,
         )
-        return _normalise_price_frame(pd.DataFrame(ticker_data["prices"]))
+        return _normalise_price_frame(pl.DataFrame(ticker_data["prices"]))
     raise HTTPException(
         status_code=400,
         detail="Either 'prices' or 'symbol' must be provided.",

@@ -1,25 +1,27 @@
 """Extended tests for the backtester calculations and risk metrics."""
 
-import pandas as pd
+import polars as pl
 import pytest
 from trading_backtester.backtester import run_backtest
 
 
+def _price_frame(dates: list[str], closes: list[float]) -> pl.DataFrame:
+    return pl.DataFrame({"date": dates, "close": closes}).with_columns(
+        pl.col("date").str.to_datetime()
+    )
+
+
 def test_backtester_calculates_sharpe_and_drawdown():
     # Simple upward trending price data
-    price_data = pd.DataFrame(
-        {
-            "date": pd.to_datetime(
-                [
-                    "2024-01-01",
-                    "2024-01-02",
-                    "2024-01-03",
-                    "2024-01-04",
-                    "2024-01-05",
-                ]
-            ),
-            "close": [10.0, 11.0, 12.0, 13.0, 14.0],
-        }
+    price_data = _price_frame(
+        [
+            "2024-01-01",
+            "2024-01-02",
+            "2024-01-03",
+            "2024-01-04",
+            "2024-01-05",
+        ],
+        [10.0, 11.0, 12.0, 13.0, 14.0],
     )
 
     result = run_backtest(price_data, strategy_type="sma", window=2)
@@ -49,19 +51,15 @@ def test_backtester_calculates_win_rate():
     # Index 1: 12 -> SMA(2) = 11. Close > SMA. BUY signal.
     # Index 2: 8 -> SMA(2) = 10. Close < SMA. SELL signal.
     # Entry at 12, exit at 8 -> loss trade.
-    price_data = pd.DataFrame(
-        {
-            "date": pd.to_datetime(
-                [
-                    "2024-01-01",
-                    "2024-01-02",
-                    "2024-01-03",
-                    "2024-01-04",
-                    "2024-01-05",
-                ]
-            ),
-            "close": [10.0, 12.0, 8.0, 15.0, 9.0],
-        }
+    price_data = _price_frame(
+        [
+            "2024-01-01",
+            "2024-01-02",
+            "2024-01-03",
+            "2024-01-04",
+            "2024-01-05",
+        ],
+        [10.0, 12.0, 8.0, 15.0, 9.0],
     )
 
     result = run_backtest(

@@ -5,10 +5,11 @@ all-in buys, all-out sells, and a fixed transaction fee. That makes the result
 easy to explain in the dashboard and predictable for unit tests.
 """
 
-from datetime import time
-from typing import Any
+import math
+from datetime import datetime, time
+from typing import Any, cast
 
-import pandas as pd
+import polars as pl
 
 from trading_backtester.models import (
     BacktestResult,
@@ -26,7 +27,7 @@ TRANSACTION_FEE_RATE = 0.001
 
 def _format_date(value: object) -> str:
     """Use compact dates for daily data and timestamps for intraday data."""
-    if isinstance(value, pd.Timestamp):
+    if isinstance(value, datetime):
         if value.time() == time(0, 0):
             return value.strftime("%Y-%m-%d")
         return value.strftime("%Y-%m-%d %H:%M:%S")
@@ -34,24 +35,62 @@ def _format_date(value: object) -> str:
 
 
 def _serialise_strategy_data(
-    strategy_data: pd.DataFrame,
+    strategy_data: pl.DataFrame,
 ) -> list[dict[str, object]]:
-    """Convert pandas rows to JSON-friendly records for API responses."""
+    """Convert polars rows to JSON-friendly records for API responses."""
     records: list[dict[str, object]] = []
-    for _, row in strategy_data.iterrows():
+    for row in strategy_data.iter_rows(named=True):
         record: dict[str, object] = {}
         for key, value in row.items():
             column = str(key)
             if column == "date":
                 record[column] = _format_date(value)
-            elif pd.isna(value):
+            elif value is None:
                 record[column] = None
-            elif hasattr(value, "item"):
-                record[column] = value.item()
             else:
                 record[column] = value
         records.append(record)
     return records
+
+
+def _pct_changes(values: list[float]) -> list[float]:
+    """Return period-over-period returns, skipping the first value."""
+    returns: list[float] = []
+    for index in range(1, len(values)):
+        previous = values[index - 1]
+        if previous == 0:
+            continue
+        returns.append((values[index] - previous) / previous)
+    return returns
+
+
+def _mean(values: list[float]) -> float:
+    if not values:
+        return 0.0
+    return sum(values) / len(values)
+
+
+def _std(values: list[float]) -> float:
+    if len(values) < 2:
+        return 0.0
+    avg = _mean(values)
+    variance = sum((value - avg) ** 2 for value in values) / (len(values) - 1)
+    return math.sqrt(variance)
+
+
+def _max_drawdown_percent(capitals: list[float]) -> float:
+    if not capitals:
+        return 0.0
+    peak = capitals[0]
+    max_drawdown = 0.0
+    for capital in capitals:
+        if capital > peak:
+            peak = capital
+        if peak > 0:
+            drawdown = (peak - capital) / peak
+            if drawdown > max_drawdown:
+                max_drawdown = drawdown
+    return max_drawdown * 100
 
 
 def _parameter_grid(strategy_type: str) -> list[dict[str, int]]:
@@ -63,7 +102,7 @@ def _parameter_grid(strategy_type: str) -> list[dict[str, int]]:
 
 
 def run_backtest(
-    price_data: pd.DataFrame,
+    price_data: pl.DataFrame,
     starting_capital: float = STARTING_CAPITAL,
     transaction_fee_rate: float = TRANSACTION_FEE_RATE,
     moving_average_window: int = DEFAULT_MOVING_AVERAGE_WINDOW,
@@ -87,7 +126,7 @@ def run_backtest(
     Returns:
         A ``BacktestResult`` with final performance and timeseries values.
     """
-    if price_data.empty:
+    if price_data.is_empty():
         raise ValueError("Price data must contain at least one row.")
     if starting_capital <= 0:
         raise ValueError("Starting capital must be greater than zero.")
@@ -117,11 +156,12 @@ def run_backtest(
     trade_profits = []
     cash_before_buy = starting_capital
 
-    for _, row in strategy_data.iterrows():
+    for row in strategy_data.iter_rows(named=True):
         close_price = float(row["close"])
         date_str = _format_date(row["date"])
+        signal = row["signal"]
 
-        if row["signal"] == "buy" and asset_units == 0:
+        if signal == "buy" and asset_units == 0:
             cash_before_buy = cash_balance
             fee = cash_balance * transaction_fee_rate
             investable_cash = cash_balance - fee
@@ -139,7 +179,7 @@ def run_backtest(
                     "cashBalance": cash_balance,
                 }
             )
-        elif row["signal"] == "sell" and asset_units > 0:
+        elif signal == "sell" and asset_units > 0:
             gross_sale_value = asset_units * close_price
             fee = gross_sale_value * transaction_fee_rate
             sold_units = asset_units
@@ -169,7 +209,9 @@ def run_backtest(
             }
         )
 
-    last_close_price = float(price_data.iloc[-1]["close"])
+    last_row = price_data.row(-1, named=True)
+    first_row = price_data.row(0, named=True)
+    last_close_price = float(last_row["close"])
     if asset_units > 0:
         end_capital = asset_units * last_close_price
         final_status = "holding asset"
@@ -182,20 +224,18 @@ def run_backtest(
     profit_loss = end_capital - starting_capital
     profit_loss_percent = (profit_loss / starting_capital) * 100
 
-    cap_series = pd.Series([item["capital"] for item in daily_portfolio_values])
-    daily_returns = cap_series.pct_change().dropna()
-    if len(daily_returns) > 1 and daily_returns.std() > 0:
+    capitals = [
+        cast("float", item["capital"]) for item in daily_portfolio_values
+    ]
+    daily_returns = _pct_changes(capitals)
+    if len(daily_returns) > 1 and _std(daily_returns) > 0:
         sharpe_ratio = float(
-            (daily_returns.mean() / daily_returns.std()) * (252**0.5)
+            (_mean(daily_returns) / _std(daily_returns)) * (252**0.5)
         )
     else:
         sharpe_ratio = 0.0
 
-    peaks = cap_series.cummax()
-    drawdowns = (cap_series - peaks) / peaks
-    max_drawdown = (
-        float(abs(drawdowns.min()) * 100) if not drawdowns.empty else 0.0
-    )
+    max_drawdown = _max_drawdown_percent(capitals)
 
     profitable_trades = sum(1 for p in trade_profits if p > 0)
     total_trades_count = len(trade_profits)
@@ -205,7 +245,7 @@ def run_backtest(
         else 0.0
     )
 
-    first_close_price = float(price_data.iloc[0]["close"])
+    first_close_price = float(first_row["close"])
     buy_and_hold_return = (
         (last_close_price - first_close_price) / first_close_price
     ) * 100
@@ -248,7 +288,7 @@ def format_results(result: BacktestResult) -> str:
 
 
 def optimize_strategy_parameters(
-    price_data: pd.DataFrame,
+    price_data: pl.DataFrame,
     starting_capital: float = STARTING_CAPITAL,
     transaction_fee_rate: float = TRANSACTION_FEE_RATE,
     strategy_type: str | StrategyType = StrategyType.SMA,

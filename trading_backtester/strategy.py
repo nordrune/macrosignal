@@ -6,9 +6,10 @@ only that signal column, while the dashboard also reads the indicator columns
 for chart overlays.
 """
 
+import math
 from typing import Any
 
-import pandas as pd
+import polars as pl
 
 from trading_backtester.models import (
     Signal,
@@ -20,20 +21,10 @@ DEFAULT_MOVING_AVERAGE_WINDOW = 20
 SUPPORTED_STRATEGIES = {strategy.value for strategy in StrategyType}
 
 
-def _assign_signals(
-    data: pd.DataFrame,
-    buy_condition: pd.Series,
-    sell_condition: pd.Series,
-) -> None:
-    """Write buy and sell signals into a strategy data frame in place."""
-    data.loc[buy_condition, "signal"] = Signal.BUY
-    data.loc[sell_condition, "signal"] = Signal.SELL
-
-
 def calculate_moving_average(
-    close_prices: pd.Series,
+    close_prices: pl.Series,
     window: int = DEFAULT_MOVING_AVERAGE_WINDOW,
-) -> pd.Series:
+) -> pl.Series:
     """Calculate a simple moving average for close prices.
 
     Args:
@@ -41,7 +32,7 @@ def calculate_moving_average(
         window: Number of data points used in the moving average.
 
     Returns:
-        A pandas series containing the moving average. Values before enough
+        A polars series containing the moving average. Values before enough
         data exists for the window are returned as missing values.
 
     Raises:
@@ -50,13 +41,13 @@ def calculate_moving_average(
     if window < 1:
         raise ValueError("Moving average window must be at least 1.")
 
-    return close_prices.rolling(window=window, min_periods=window).mean()
+    return close_prices.rolling_mean(window_size=window, min_samples=window)
 
 
 def calculate_ema(
-    close_prices: pd.Series,
+    close_prices: pl.Series,
     window: int = DEFAULT_MOVING_AVERAGE_WINDOW,
-) -> pd.Series:
+) -> pl.Series:
     """Calculate the exponential moving average (EMA) for close prices.
 
     EMA reacts faster to recent price changes than a simple moving average
@@ -64,7 +55,7 @@ def calculate_ema(
     """
     if window < 1:
         raise ValueError("EMA window must be at least 1.")
-    return close_prices.ewm(span=window, adjust=False).mean()
+    return close_prices.ewm_mean(span=window, adjust=False)
 
 
 def generate_signal(close_price: float, moving_average: float) -> Signal:
@@ -78,7 +69,7 @@ def generate_signal(close_price: float, moving_average: float) -> Signal:
         ``Signal.BUY`` when price is above the moving average,
         ``Signal.SELL`` when price is below it, and ``Signal.HOLD`` otherwise.
     """
-    if pd.isna(moving_average):
+    if math.isnan(moving_average):
         return Signal.HOLD
     if close_price > moving_average:
         return Signal.BUY
@@ -87,11 +78,48 @@ def generate_signal(close_price: float, moving_average: float) -> Signal:
     return Signal.HOLD
 
 
+def _sma_signals(window: int) -> list[pl.Expr]:
+    """Build SMA indicator and signal columns."""
+    moving_average = pl.col("close").rolling_mean(
+        window_size=window, min_samples=window
+    )
+    has_average = moving_average.is_not_null()
+    return [
+        moving_average.alias("moving_average"),
+        (
+            pl.when(~has_average)
+            .then(pl.lit(Signal.HOLD))
+            .when(pl.col("close") > moving_average)
+            .then(pl.lit(Signal.BUY))
+            .when(pl.col("close") < moving_average)
+            .then(pl.lit(Signal.SELL))
+            .otherwise(pl.lit(Signal.HOLD))
+            .alias("signal")
+        ),
+    ]
+
+
+def _ema_signals(window: int) -> list[pl.Expr]:
+    """Build EMA indicator and signal columns."""
+    moving_average = pl.col("close").ewm_mean(span=window, adjust=False)
+    return [
+        moving_average.alias("moving_average"),
+        (
+            pl.when(pl.col("close") > moving_average)
+            .then(pl.lit(Signal.BUY))
+            .when(pl.col("close") < moving_average)
+            .then(pl.lit(Signal.SELL))
+            .otherwise(pl.lit(Signal.HOLD))
+            .alias("signal")
+        ),
+    ]
+
+
 def generate_strategy_signals(
-    price_data: pd.DataFrame,
+    price_data: pl.DataFrame,
     strategy_type: str | StrategyType = StrategyType.SMA,
     **kwargs: Any,
-) -> pd.DataFrame:
+) -> pl.DataFrame:
     """Generate indicators and buy/sell/hold signals for a selected strategy.
 
     Args:
@@ -110,27 +138,12 @@ def generate_strategy_signals(
     if strategy not in SUPPORTED_STRATEGIES:
         raise ValueError(f"Unknown strategy type: {strategy_type}")
 
-    data = price_data.copy()
-    close = data["close"]
-    data["signal"] = Signal.HOLD
+    window = kwargs.get("window", 20)
 
     if strategy == StrategyType.SMA.value:
-        window = kwargs.get("window", 20)
-        data["moving_average"] = calculate_moving_average(close, window)
-        has_average = data["moving_average"].notna()
-        _assign_signals(
-            data,
-            buy_condition=has_average & (close > data["moving_average"]),
-            sell_condition=has_average & (close < data["moving_average"]),
-        )
+        return price_data.with_columns(_sma_signals(window))
 
-    elif strategy == StrategyType.EMA.value:
-        window = kwargs.get("window", 20)
-        data["moving_average"] = calculate_ema(close, window)
-        _assign_signals(
-            data,
-            buy_condition=close > data["moving_average"],
-            sell_condition=close < data["moving_average"],
-        )
+    if strategy == StrategyType.EMA.value:
+        return price_data.with_columns(_ema_signals(window))
 
-    return data
+    raise ValueError(f"Unknown strategy type: {strategy_type}")
