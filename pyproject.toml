@@ -16,7 +16,7 @@ dev = [
     "ruff>=0.12.0",
     "ty",
     "pytest",
-    "httpx2>=2.4.0",
+    "httpx2>=2.3.0",
 ]
 
 [build-system]
@@ -34,3 +34,4 @@ pythonpath = ["."]
 
 [tool.uv]
 package = true
+exclude-newer = "7 days"

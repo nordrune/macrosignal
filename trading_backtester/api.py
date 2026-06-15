@@ -6,6 +6,7 @@ from the core backtester so the simulation can also be used from the CLI.
 """
 
 import logging
+import os
 from dataclasses import asdict
 from typing import Any
 
@@ -13,8 +14,11 @@ import pandas as pd
 import yfinance as yf
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from starlette.datastructures import Headers
+from starlette.responses import Response
+from starlette.staticfiles import StaticFiles
+from starlette.types import Scope
 
 from trading_backtester.backtester import (
     optimize_strategy_parameters,
@@ -340,8 +344,41 @@ def optimize_strategy(request: OptimizeRequest) -> OptimizeResponse:
         ) from exc
 
 
+class NoCacheStaticFiles(StaticFiles):
+    """Serve frontend assets without long-lived browser caching."""
+
+    _NO_CACHE = "no-store, no-cache, must-revalidate, max-age=0"
+
+    def is_not_modified(
+        self,
+        response_headers: Headers,
+        request_headers: Headers,
+    ) -> bool:
+        _ = (response_headers, request_headers)
+        return False
+
+    def file_response(
+        self,
+        full_path: str | os.PathLike[str],
+        stat_result: os.stat_result,
+        scope: Scope,
+        status_code: int = 200,
+    ) -> Response:
+        response = super().file_response(
+            full_path, stat_result, scope, status_code=status_code
+        )
+        response.headers["Cache-Control"] = self._NO_CACHE
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
+
+
 try:
-    app.mount("/", StaticFiles(directory="frontend", html=True), name="static")
+    app.mount(
+        "/",
+        NoCacheStaticFiles(directory="frontend", html=True),
+        name="static",
+    )
 except Exception as exc:
     logger.warning(
         "Could not mount static files directory: %s. "
