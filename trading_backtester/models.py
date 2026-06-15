@@ -6,10 +6,10 @@ API-specific dependencies.
 """
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 
-class Signal(str, Enum):
+class Signal(StrEnum):
     """Trading actions produced by a strategy."""
 
     BUY = "buy"
@@ -17,11 +17,18 @@ class Signal(str, Enum):
     HOLD = "hold"
 
 
-class StrategyType(str, Enum):
+class StrategyType(StrEnum):
     """Supported trading strategies."""
 
     SMA = "sma"
     EMA = "ema"
+
+
+def normalize_strategy_type(strategy_type: str | StrategyType) -> str:
+    """Return the lowercase strategy key used across the backtester."""
+    if isinstance(strategy_type, StrategyType):
+        return strategy_type.value
+    return str(strategy_type).strip().lower()
 
 
 @dataclass(frozen=True)
@@ -47,6 +54,3 @@ class BacktestResult:
     capital_history: list[dict[str, object]]
     series_data: list[dict[str, object]]
     trades: list[dict[str, object]]
-
-
-
