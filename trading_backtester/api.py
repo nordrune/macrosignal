@@ -146,6 +146,8 @@ def _fetch_yahoo_prices(
                 "close": float(row["close"]),
             }
         )
+    if len(records) > MAX_PRICE_POINTS:
+        records = records[-MAX_PRICE_POINTS:]
     return {"symbol": symbol.upper(), "prices": records}
 
 
