@@ -34,6 +34,7 @@
 		capPricePoints,
 		DEFAULT_FEE_PERCENT,
 		DEFAULT_STARTING_CAPITAL,
+		MAX_TRADE_TABLE_ROWS,
 		TICKER_SUGGESTIONS
 	} from '$lib/defaults';
 	import { SAMPLE_CSV, parseCsvText } from '$lib/csv';
@@ -133,6 +134,8 @@
 	const sortedTrades = $derived(
 		result?.trades.length ? sortTrades(result.trades, tradeSortKey, tradeSortDir) : []
 	);
+	const displayedTrades = $derived(sortedTrades.slice(0, MAX_TRADE_TABLE_ROWS));
+	const tradesTruncated = $derived(sortedTrades.length > MAX_TRADE_TABLE_ROWS);
 
 	function setStatus(msg: string, type: StatusType = 'info') {
 		statusMessage = msg;
@@ -1073,9 +1076,9 @@
 					{#if isInitialLoad}
 						<TableSkeleton columns={6} rows={5} />
 					{:else}
-						<div class="{SURFACE_CLASS.table} overflow-x-auto rounded-lg border">
+						<div class="{SURFACE_CLASS.table} max-h-96 overflow-auto rounded-lg border">
 							<Table.Table>
-								<Table.TableHeader>
+								<Table.TableHeader class="bg-background/95 sticky top-0 z-10 backdrop-blur-sm">
 									<Table.TableRow>
 										{#each TRADE_COLUMNS as column (column.key)}
 											<Table.TableHead
@@ -1111,7 +1114,7 @@
 											</Table.TableCell>
 										</Table.TableRow>
 									{:else}
-										{#each sortedTrades as { trade, index } (trade.date + trade.type + index)}
+										{#each displayedTrades as { trade, index } (trade.date + trade.type + index)}
 											<Table.TableRow
 												class={cn(
 													'cursor-pointer',
@@ -1142,6 +1145,14 @@
 								</Table.TableBody>
 							</Table.Table>
 						</div>
+						{#if tradesTruncated}
+							<p class="text-muted-foreground text-xs">
+								{i18n.t('trades.truncated', {
+									shown: MAX_TRADE_TABLE_ROWS,
+									total: sortedTrades.length
+								})}
+							</p>
+						{/if}
 					{/if}
 
 					{#if result}

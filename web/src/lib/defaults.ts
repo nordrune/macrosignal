@@ -11,6 +11,7 @@ export function capPricePoints(prices: PricePoint[]): PricePoint[] {
 
 export const DEFAULT_STARTING_CAPITAL = 10_000;
 export const DEFAULT_FEE_PERCENT = 0.1;
+export const MAX_TRADE_TABLE_ROWS = 50;
 
 export const TICKER_SUGGESTIONS = [
 	{ label: 'BTC', symbol: 'BTC-USD' },
