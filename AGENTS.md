@@ -24,6 +24,7 @@ Repo: https://github.com/nordrune/macrosignal
 
 ## User preferences
 
+- Commits: [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `chore:`, `refactor:`, optional scope); title only, no body, no em dashes
 - Ponytail minimalism: delete before adding; `# ponytail:` / `// ponytail:` on shortcuts
 - Docs: DOX AGENTS.md tree (not changelog prose in README)
 - Latest reasonable versions; Bun not pnpm/Node
