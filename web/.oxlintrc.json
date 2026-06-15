@@ -1,0 +1,49 @@
+{
+	"$schema": "./node_modules/oxlint/configuration_schema.json",
+	"plugins": ["typescript", "unicorn", "oxc", "import"],
+	"env": {
+		"browser": true,
+		"node": true
+	},
+	"categories": {
+		"correctness": "error",
+		"suspicious": "warn"
+	},
+	"ignorePatterns": ["build/**", ".svelte-kit/**", "node_modules/**", "src/lib/components/ui/**"],
+	"rules": {
+		"no-debugger": "error",
+		"no-unused-vars": "warn",
+		"typescript/no-explicit-any": "warn",
+		"import/no-duplicates": "error"
+	},
+	"overrides": [
+		{
+			"files": ["**/*.svelte"],
+			"rules": {
+				"no-unused-expressions": "off"
+			}
+		},
+		{
+			"files": ["src/lib/utils.ts"],
+			"rules": {
+				"typescript/no-explicit-any": "off"
+			}
+		},
+		{
+			"files": ["src/app.d.ts", "src/routes/+layout.svelte"],
+			"rules": {
+				"unicorn/require-module-specifiers": "off",
+				"import/no-unassigned-import": "off"
+			}
+		},
+		{
+			"files": ["src/routes/+page.svelte"],
+			"rules": {
+				"unicorn/prefer-add-event-listener": "off"
+			}
+		}
+	],
+	"options": {
+		"respectEslintDisableDirectives": true
+	}
+}

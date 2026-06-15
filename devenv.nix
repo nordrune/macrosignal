@@ -1,7 +1,8 @@
 { pkgs, lib, config, ... }:
 
 let
-  appPort = 41793;
+  apiPort = 41793;
+  webPort = 5173;
   uvRun = "env -u VIRTUAL_ENV uv run";
   qaFormat = "${uvRun} ruff format .";
   qaLint = "${uvRun} ruff check .";
@@ -11,8 +12,13 @@ let
   litestarApp = ''
     ${uvRun} litestar --app trading_backtester.api:app run \
       --host "$HOST" \
-      --port "$PORT"
+      --port "$API_PORT"
   '';
+  webDir = "web";
+  webRun = "cd ${webDir} && bun run";
+  qaWebFormat = "${webRun} format";
+  qaWebLint = "${webRun} lint";
+  qaWebTypecheck = "${webRun} typecheck";
 in
 {
   name = "macrosignal";
@@ -20,6 +26,7 @@ in
   delta.enable = true;
 
   packages = [
+    pkgs.bun
     pkgs.cacert
     pkgs.curl
   ];
@@ -37,13 +44,25 @@ in
     };
   };
 
+  languages.javascript = {
+    enable = true;
+    directory = webDir;
+    bun = {
+      enable = true;
+      install.enable = true;
+    };
+  };
+
   env = {
     HOST = "127.0.0.1";
-    PORT = toString appPort;
+    API_PORT = toString apiPort;
+    WEB_PORT = toString webPort;
+    API_ORIGIN = "http://127.0.0.1:${toString apiPort}";
+    PORT = toString apiPort;
     ENV = lib.mkDefault "dev";
   };
 
-  processes.app = {
+  processes.api = {
     exec = ''
       if [ "$ENV" = prod ]; then
         ${litestarApp}
@@ -55,10 +74,23 @@ in
     ready = {
       http.get = {
         host = "127.0.0.1";
-        port = appPort;
+        port = apiPort;
         path = "/health";
       };
       initial_delay = 2;
+    };
+    restart.on = "on_failure";
+  };
+
+  processes.web = {
+    exec = "cd ${webDir} && bun --bun run dev --port $WEB_PORT";
+    ready = {
+      http.get = {
+        host = "127.0.0.1";
+        port = webPort;
+        path = "/";
+      };
+      initial_delay = 3;
     };
     restart.on = "on_failure";
   };
@@ -89,32 +121,47 @@ in
       after = [ "qa:lint" ];
       before = [ "devenv:enterTest" ];
     };
+    "qa:web:format" = {
+      exec = qaWebFormat;
+      before = [ "devenv:enterTest" ];
+    };
+    "qa:web:lint" = {
+      exec = qaWebLint;
+      after = [ "qa:web:format" ];
+      before = [ "devenv:enterTest" ];
+    };
+    "qa:web:typecheck" = {
+      exec = qaWebTypecheck;
+      after = [ "qa:web:lint" ];
+      before = [ "devenv:enterTest" ];
+    };
     "qa:pytest" = {
       exec = qaPytest;
-      after = [ "qa:typecheck" ];
+      after = [ "qa:typecheck" "qa:web:typecheck" ];
       before = [ "devenv:enterTest" ];
     };
     "qa:smoke" = {
       exec = ''
-        curl -sf -X POST http://127.0.0.1:${toString appPort}/api/backtest \
+        curl -sf -X POST http://127.0.0.1:${toString apiPort}/api/backtest \
           -H "Content-Type: application/json" \
           -d @tests/fixtures/smoke_backtest_request.json \
           | grep -q "end_capital"
       '';
       after = [
         "qa:pytest"
-        "devenv:processes:app@ready"
+        "devenv:processes:api@ready"
       ];
       before = [ "devenv:enterTest" ];
     };
   };
 
   enterShell = ''
-    echo "MacroSignal ready: http://127.0.0.1:${toString appPort}"
-    echo "  devenv up            # ENV=dev (default)"
-    echo "  ENV=prod devenv up   # production-style"
+    echo "MacroSignal API:  http://127.0.0.1:${toString apiPort}"
+    echo "MacroSignal Web:  http://127.0.0.1:${toString webPort}  (devenv up)"
+    echo "  devenv up            # API + SvelteKit dev"
+    echo "  ENV=prod devenv up   # production-style API"
     echo "  devenv test"
-    echo "  devenv tasks run qa:lint"
+    echo "  cd web && bun run qa  # oxfmt + oxlint + svelte-check"
     echo "  git push runs devenv test (full QA gate)"
   '';
 }
