@@ -1,31 +1,21 @@
 # MacroSignal
 
-MacroSignal is a small trading backtester for a software engineering project.
-It loads historical close prices, creates strategy signals, simulates virtual
-buy and sell trades, and shows the result in a browser dashboard.
+MacroSignal is a trading backtester for a software engineering project. It loads
+historical close prices, generates strategy signals, simulates virtual buy/sell
+trades, and shows results in a browser dashboard.
 
-The project is meant for learning and comparison of simple trading rules. It
-does not connect to a broker and it does not place real trades.
+Educational tool only — no broker integration or live trading.
 
 ## Features
 
-- Load historical prices from Yahoo Finance or from a CSV file.
-- Run backtests with a configurable starting balance and transaction fee.
-- Compare rule-based strategies:
-  - Simple Moving Average (SMA)
-  - Exponential Moving Average (EMA)
-- Show performance metrics:
-  - final capital
-  - profit or loss
-  - strategy return
-  - Sharpe ratio
-  - maximum drawdown
-  - win rate
-  - buy-and-hold return
-- Display price, indicator, drawdown, and trade information in the web UI.
-- Run a simple grid search to find better parameters for a selected strategy.
-- Switch the dashboard between German and English.
-- Explain trading terms in the UI with small tooltips.
+- Load prices from Yahoo Finance or a CSV file
+- Backtest with configurable starting balance and transaction fee
+- Compare SMA and EMA strategies
+- Performance metrics: final capital, P/L, Sharpe, max drawdown, win rate, buy-and-hold
+- Canvas charts for price, indicator, drawdown, and trades
+- Grid-search optimizer for strategy parameters
+- German/English UI with tooltips for trading terms
+- CSV export of run parameters and trades
 
 ## Project Structure
 
@@ -33,89 +23,73 @@ does not connect to a broker and it does not place real trades.
 .
 ├── data/
 │   └── sample_prices.csv          Example CSV input
-├── frontend/
-│   ├── app.js                     Dashboard state, API calls, charts
-│   ├── csv.js                     CSV parsing and sample CSV data
-│   ├── formatters.js              Shared value formatting helpers
-│   ├── i18n.js                    German/English translations
-│   ├── index.html                 Dashboard markup
-│   ├── strategy-config.js         Strategy form and legend mapping
-│   └── styles.css                 Dashboard styling
+├── web/                           SvelteKit 2 dashboard (Bun, Tailwind v4)
 ├── tests/
-│   ├── fixtures/                  Smoke test payloads for devenv test
-│   └── …                          Unit and API tests
+│   ├── fixtures/                  Smoke payloads for devenv test
+│   └── …                          Unit and API contract tests
 ├── trading_backtester/
-│   ├── api.py                     FastAPI routes
+│   ├── api.py                     Litestar routes
+│   ├── dto.py                     msgspec request/response DTOs
 │   ├── backtester.py              Trade simulation and optimizer
 │   ├── data_loader.py             CSV loading and validation
 │   ├── main.py                    CLI and server entry point
 │   ├── models.py                  Shared dataclasses and enums
 │   └── strategy.py                Indicators and signal generation
 ├── main.py                        Thin root entry point
-├── .envrc                         direnv entry (loads devenv)
-├── devenv.nix                     Isolated dev environment (Nix + UV)
-├── devenv.yaml                    devenv inputs
+├── AGENTS.md                      DOX index (read before editing)
+├── devenv.nix                     Dev environment (Nix + UV + Bun)
 ├── pyproject.toml                 Python dependencies (UV)
-├── ruff.toml                      Lint and format rules
-├── ty.toml                        Type checker config
-├── uv.lock                        Locked Python dependencies
 └── pytest.ini
 ```
 
 ## Setup
 
 Requires [devenv](https://devenv.sh/getting-started/) and [Nix](https://nixos.org/download/).
-All Python tooling runs through devenv — do not use bare `uv`, `pip`, or host Python.
+Python and web tooling run through devenv — do not use bare `uv`, `pip`, or host Node.
 
 ```bash
 devenv allow          # once, trust this project
 direnv allow          # once, auto-load env when you cd into the repo
+devenv shell          # syncs Python (UV) and web (Bun) deps on first entry
 ```
 
-Enter the environment (syncs Python deps via UV on first entry):
-
-```bash
-devenv shell
-```
-
-With direnv allowed, `cd` into the repo loads the same environment automatically.
-Process settings (`HOST`, `PORT`) live in `devenv.nix` — no `.env` file needed.
+Process settings (`HOST`, `API_PORT`, `WEB_PORT`, `API_ORIGIN`) live in `devenv.nix`.
 
 ## Run the App
 
-MacroSignal is a single process (`app`) that serves the API and frontend.
-
-Development (hot reload on Python changes):
+Development — API and SvelteKit dev servers:
 
 ```bash
 devenv up
 ```
 
-Production-style process (localhost only, no reload):
+Open the dashboard at `http://127.0.0.1:5173`. The web dev server proxies
+`/api` and `/health` to the Litestar API on `:41793`.
+
+Production-style API (no Python reload):
 
 ```bash
-ENV=prod devenv --no-tui up app
+ENV=prod devenv --no-tui up api
 ```
 
-On the prod server, set `ENV=prod` in the systemd unit (or export it before `devenv up`).
+Build the web app for production (Bun adapter):
 
-Then open:
-
-```text
-http://127.0.0.1:41793/
+```bash
+cd web && bun run build
+cd web && bun run build/index.js   # serves on $PORT (default from adapter)
 ```
 
-## Run a CLI Backtest
+Set `API_ORIGIN` so the Bun server can proxy API requests to Litestar.
 
-From the devenv environment (`devenv shell` or direnv):
+## CLI Backtest
+
+From the devenv environment:
 
 ```bash
 python -m trading_backtester.main data/sample_prices.csv
 ```
 
-(`python` here is the devenv-managed interpreter, not system Python.)
-
-The CSV file must contain at least these columns:
+CSV must include `date` and `close` columns:
 
 ```csv
 date,close
@@ -125,61 +99,48 @@ date,close
 
 ## Development
 
-On first `devenv shell`, a pre-push hook is installed. Every `git push` runs
-full QA via `devenv test` (format, lint, typecheck, pytest, integration smoke).
-
-Run the same QA manually:
+A pre-push hook runs full QA via `devenv test` (format, lint, typecheck, pytest, smoke).
 
 ```bash
 devenv test
 ```
 
-`devenv test` runs the `qa:*` task graph natively via `devenv:enterTest` and
-`devenv:processes:app@ready` dependencies — no shell script orchestration.
+Do not run `devenv up` and `devenv test` at the same time — both bind API port 41793.
 
-Individual QA steps:
+Individual tasks:
 
 ```bash
-devenv tasks run qa:format
-devenv tasks run qa:lint
-devenv tasks run qa:typecheck
+devenv tasks run qa:format          # Python ruff format
+devenv tasks run qa:lint            # Python ruff check
+devenv tasks run qa:typecheck       # Python ty
+devenv tasks run qa:web             # Oxc + svelte-check (web/)
 devenv tasks run qa:pytest
-devenv tasks run qa:smoke
-devenv tasks run qa            # all qa:* tasks
+devenv tasks run qa:smoke           # API POST + web HTML check
+devenv tasks run build:web          # production SvelteKit build
 ```
 
-## Tests
+Process shortcuts:
 
-The tests cover CSV validation, indicator calculations, signal generation,
-backtest accounting, optimizer output, and the API endpoints.
+```bash
+devenv up              # api + web
+devenv up api          # Litestar only
+devenv up web          # SvelteKit only (API must be reachable)
+```
 
-## Documentation Style
+Web-only QA:
 
-The codebase uses one documentation style across backend and frontend:
+```bash
+cd web && bun run qa                # oxfmt, oxlint, svelte-check
+```
 
-- Python modules start with a module docstring that explains the file purpose.
-- Public Python functions and dataclasses use concise docstrings with inputs,
-  outputs, and important error cases.
-- Frontend helper modules use JSDoc for exported functions.
-- `frontend/app.js` uses section comments for the main UI areas and short
-  function comments for API calls, rendering, charting, and event handling.
-- Comments should explain intent, data flow, or a non-obvious decision. They
-  should not repeat what a single line of code already says.
+## Documentation
 
-## Current Scope
+- Root and package `AGENTS.md` files describe architecture, contracts, and verification.
+- Python modules use module docstrings; public APIs use concise docstrings.
+- Web helpers use brief file-level comments where intent is non-obvious.
 
-Included:
+## Scope
 
-- historical price backtesting
-- virtual all-in/all-out trades
-- transaction fees
-- strategy metrics and trade logs
-- local dashboard
+Included: historical backtesting, all-in/all-out virtual trades, fees, metrics, local dashboard.
 
-Not included:
-
-- real broker integration
-- live trading
-- order book or intraday execution simulation
-- portfolio allocation across several assets
-- news, macro, or geopolitical event analysis
+Not included: broker integration, live trading, intraday execution, multi-asset portfolios, news/macro analysis.

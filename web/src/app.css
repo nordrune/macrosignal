@@ -50,6 +50,11 @@
 	* {
 		@apply border-border;
 	}
+	html,
+	body {
+		overflow-x: clip;
+	}
+
 	body {
 		@apply bg-background text-foreground antialiased;
 		font-family: 'Plus Jakarta Sans', system-ui, sans-serif;

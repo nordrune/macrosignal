@@ -1,5 +1,5 @@
 <script lang="ts">
-	// ponytail: canvas not Recharts — exact behavior parity with frontend/app.js drawCharts()
+	// ponytail: canvas charts — no chart library dependency
 	import { browser } from '$app/environment';
 	import type { CapitalPoint, SeriesPoint, Trade } from '$lib/api';
 	import { formatCurrency } from '$lib/formatters';
@@ -45,7 +45,13 @@
 	let subChartGeom = $state<ChartGeom | null>(null);
 	let animationFrame = $state<number | null>(null);
 
-	const margin = { top: 12, right: 16, bottom: 12, left: 54 };
+	function chartMargin() {
+		if (!browser) return { top: 12, right: 16, bottom: 12, left: 54 };
+		const narrow = window.innerWidth < 640;
+		return narrow
+			? { top: 10, right: 8, bottom: 10, left: 42 }
+			: { top: 12, right: 16, bottom: 12, left: 54 };
+	}
 
 	function getChartHelpers(
 		canvas: HTMLCanvasElement,
@@ -53,6 +59,7 @@
 		minVal: number,
 		maxVal: number
 	) {
+		const margin = chartMargin();
 		const rect = canvas.getBoundingClientRect();
 		const dpr = window.devicePixelRatio || 1;
 
@@ -79,13 +86,15 @@
 		height: number,
 		minVal: number,
 		maxVal: number,
+		margin: { top: number; right: number; bottom: number; left: number },
 		rows = 4,
 		formatFn: (v: number) => string = (v) => v.toFixed(0)
 	) {
+		const narrow = browser && window.innerWidth < 640;
 		ctx.strokeStyle = '#242a3c';
 		ctx.lineWidth = 1;
 		ctx.fillStyle = '#9ca3af';
-		ctx.font = '9px system-ui';
+		ctx.font = narrow ? '8px system-ui' : '9px system-ui';
 		ctx.textAlign = 'right';
 
 		const range = maxVal - minVal;
@@ -97,7 +106,7 @@
 			ctx.stroke();
 
 			const val = maxVal - (range / rows) * i;
-			ctx.fillText(formatFn(val), margin.left - 8, y + 3);
+			ctx.fillText(formatFn(val), margin.left - (narrow ? 4 : 8), y + 3);
 		}
 	}
 
@@ -169,6 +178,7 @@
 			priceHelpers.height,
 			minPrice - pricePad,
 			maxPrice + pricePad,
+			priceHelpers.margin,
 			4,
 			formatCurrency
 		);
@@ -207,7 +217,12 @@
 				const xStart = priceHelpers.xForIdx(entryIdx);
 				const xEnd = priceHelpers.xForIdx(exitIdx);
 				priceHelpers.ctx.fillStyle = 'rgba(124, 58, 237, 0.07)';
-				priceHelpers.ctx.fillRect(xStart, margin.top, xEnd - xStart, priceHelpers.height);
+				priceHelpers.ctx.fillRect(
+					xStart,
+					priceHelpers.margin.top,
+					xEnd - xStart,
+					priceHelpers.height
+				);
 			}
 		}
 
@@ -235,8 +250,8 @@
 			priceHelpers.ctx.strokeStyle = 'rgba(0, 230, 195, 0.3)';
 			priceHelpers.ctx.lineWidth = 1;
 			priceHelpers.ctx.beginPath();
-			priceHelpers.ctx.moveTo(hx, margin.top);
-			priceHelpers.ctx.lineTo(hx, priceHelpers.rect.height - margin.bottom);
+			priceHelpers.ctx.moveTo(hx, priceHelpers.margin.top);
+			priceHelpers.ctx.lineTo(hx, priceHelpers.rect.height - priceHelpers.margin.bottom);
 			priceHelpers.ctx.stroke();
 
 			priceHelpers.ctx.beginPath();
@@ -265,6 +280,7 @@
 			subHelpers.height,
 			subMin,
 			subMax,
+			subHelpers.margin,
 			2,
 			(v) => `${v.toFixed(1)}%`
 		);
@@ -305,8 +321,8 @@
 			subHelpers.ctx.strokeStyle = 'rgba(0, 230, 195, 0.3)';
 			subHelpers.ctx.lineWidth = 1;
 			subHelpers.ctx.beginPath();
-			subHelpers.ctx.moveTo(hx, margin.top);
-			subHelpers.ctx.lineTo(hx, subHelpers.rect.height - margin.bottom);
+			subHelpers.ctx.moveTo(hx, subHelpers.margin.top);
+			subHelpers.ctx.lineTo(hx, subHelpers.rect.height - subHelpers.margin.bottom);
 			subHelpers.ctx.stroke();
 		}
 	}
@@ -334,9 +350,9 @@
 		if (!geometry || !seriesData.length) return null;
 
 		const x = clientX - geometry.rect.left;
-		if (x < margin.left || x > margin.left + geometry.width) return null;
+		if (x < geometry.margin.left || x > geometry.margin.left + geometry.width) return null;
 
-		const relativeX = (x - margin.left) / geometry.width;
+		const relativeX = (x - geometry.margin.left) / geometry.width;
 		return Math.max(
 			0,
 			Math.min(seriesData.length - 1, Math.round(relativeX * (seriesData.length - 1)))
@@ -364,7 +380,7 @@
 		tooltipEl.hidden = false;
 	}
 
-	function handleMouseMove(e: MouseEvent, geometry: ChartGeom | null) {
+	function handlePointerMove(e: PointerEvent, geometry: ChartGeom | null) {
 		const idx = findNearestIndex(e.clientX, geometry);
 		if (idx !== null) {
 			onSelectPoint?.(idx);
@@ -372,7 +388,7 @@
 		}
 	}
 
-	function handleMouseLeave() {
+	function handlePointerLeave() {
 		if (tooltipEl) tooltipEl.hidden = true;
 	}
 
@@ -396,29 +412,41 @@
 
 <svelte:window onresize={handleResize} />
 
-<div class="relative space-y-2">
-	<div class="border-border bg-card/50 relative h-64 w-full overflow-hidden rounded-lg border">
+<div class="relative min-w-0 space-y-2">
+	<div
+		class="border-border bg-card/50 relative h-48 w-full min-w-0 overflow-hidden rounded-lg border sm:h-56 md:h-64"
+	>
 		<canvas
 			bind:this={priceCanvas}
-			class="h-full w-full cursor-crosshair"
+			class="h-full w-full cursor-crosshair touch-none"
 			aria-label={i18n.t('chart.mainAria')}
-			onmousemove={(e) => handleMouseMove(e, chartGeom)}
-			onmouseleave={handleMouseLeave}
+			onpointermove={(e) => handlePointerMove(e, chartGeom)}
+			onpointerleave={handlePointerLeave}
+			onpointerdown={(e) => {
+				e.currentTarget.setPointerCapture(e.pointerId);
+				handlePointerMove(e, chartGeom);
+			}}
 		></canvas>
 		<div
 			bind:this={tooltipEl}
-			class="border-border bg-popover pointer-events-none absolute z-10 hidden min-w-32 -translate-x-1/2 -translate-y-full rounded-md border px-2 py-1.5 text-xs shadow-md"
+			class="border-border bg-popover pointer-events-none absolute z-10 hidden max-w-[calc(100%-1rem)] min-w-28 -translate-x-1/2 -translate-y-full rounded-md border px-2 py-1.5 text-xs shadow-md"
 			hidden
 		></div>
 	</div>
 
-	<div class="border-border bg-card/50 h-28 w-full overflow-hidden rounded-lg border">
+	<div
+		class="border-border bg-card/50 h-24 w-full min-w-0 overflow-hidden rounded-lg border sm:h-28"
+	>
 		<canvas
 			bind:this={indicatorCanvas}
-			class="h-full w-full cursor-crosshair"
+			class="h-full w-full cursor-crosshair touch-none"
 			aria-label={i18n.t('chart.subAria')}
-			onmousemove={(e) => handleMouseMove(e, subChartGeom)}
-			onmouseleave={handleMouseLeave}
+			onpointermove={(e) => handlePointerMove(e, subChartGeom)}
+			onpointerleave={handlePointerLeave}
+			onpointerdown={(e) => {
+				e.currentTarget.setPointerCapture(e.pointerId);
+				handlePointerMove(e, subChartGeom);
+			}}
 		></canvas>
 	</div>
 </div>

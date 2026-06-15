@@ -36,7 +36,7 @@ def _format_date(value: object) -> str:
 def _serialise_strategy_data(
     strategy_data: pd.DataFrame,
 ) -> list[dict[str, object]]:
-    """Convert pandas rows to JSON-friendly records for the API and frontend."""
+    """Convert pandas rows to JSON-friendly records for API responses."""
     records: list[dict[str, object]] = []
     for _, row in strategy_data.iterrows():
         record: dict[str, object] = {}

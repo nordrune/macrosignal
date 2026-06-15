@@ -30,4 +30,6 @@
 	/>
 </svelte:head>
 
-{@render children()}
+<div class="min-h-screen overflow-x-clip">
+	{@render children()}
+</div>

@@ -19,6 +19,8 @@ let
   qaWebFormat = "${webRun} format";
   qaWebLint = "${webRun} lint";
   qaWebTypecheck = "${webRun} typecheck";
+  qaWeb = "${webRun} qa";
+  webBuild = "${webRun} build";
 in
 {
   name = "macrosignal";
@@ -83,7 +85,7 @@ in
   };
 
   processes.web = {
-    exec = "cd ${webDir} && bun --bun run dev --port $WEB_PORT";
+    exec = "cd ${webDir} && bun --bun run dev --port \"$WEB_PORT\" --host \"$HOST\"";
     ready = {
       http.get = {
         host = "127.0.0.1";
@@ -135,6 +137,14 @@ in
       after = [ "qa:web:lint" ];
       before = [ "devenv:enterTest" ];
     };
+    # Manual aliases — not part of devenv test (individual qa:web:* tasks already run)
+    "qa:web" = {
+      exec = qaWeb;
+      after = [ "qa:web:typecheck" ];
+    };
+    "build:web" = {
+      exec = webBuild;
+    };
     "qa:pytest" = {
       exec = qaPytest;
       after = [ "qa:typecheck" "qa:web:typecheck" ];
@@ -146,22 +156,28 @@ in
           -H "Content-Type: application/json" \
           -d @tests/fixtures/smoke_backtest_request.json \
           | grep -q "end_capital"
+        curl -sf http://127.0.0.1:${toString webPort}/ | grep -q "MacroSignal"
       '';
       after = [
         "qa:pytest"
         "devenv:processes:api@ready"
+        "devenv:processes:web@ready"
       ];
       before = [ "devenv:enterTest" ];
     };
   };
 
   enterShell = ''
-    echo "MacroSignal API:  http://127.0.0.1:${toString apiPort}"
+    echo "MacroSignal API:  http://127.0.0.1:${toString apiPort}  (API_ORIGIN)"
     echo "MacroSignal Web:  http://127.0.0.1:${toString webPort}  (devenv up)"
-    echo "  devenv up            # API + SvelteKit dev"
-    echo "  ENV=prod devenv up   # production-style API"
-    echo "  devenv test"
-    echo "  cd web && bun run qa  # oxfmt + oxlint + svelte-check"
-    echo "  git push runs devenv test (full QA gate)"
+    echo ""
+    echo "  devenv up                  # api + web dev processes"
+    echo "  devenv up api              # API only"
+    echo "  devenv up web              # SvelteKit only (needs API running)"
+    echo "  ENV=prod devenv up api     # production-style API (no reload)"
+    echo "  devenv test                # full QA (kill devenv up first — port ${toString apiPort})"
+    echo "  devenv tasks run qa:web    # web oxfmt + oxlint + svelte-check"
+    echo "  devenv tasks run build:web # production web build"
+    echo "  git push runs devenv test (pre-push hook)"
   '';
 }

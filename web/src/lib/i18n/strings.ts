@@ -1,4 +1,4 @@
-/** User-facing copy ported from frontend/i18n.js */
+/** German/English UI strings keyed for i18n context. */
 
 export const STRINGS = {
 	de: {

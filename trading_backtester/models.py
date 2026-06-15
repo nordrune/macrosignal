@@ -1,7 +1,7 @@
 """Shared data models for MacroSignal.
 
 These models are intentionally small and framework-independent so they can be
-used by the CLI, FastAPI routes, tests, and future interfaces without creating
+used by the CLI, Litestar routes, tests, and future interfaces without creating
 API-specific dependencies.
 """
 
