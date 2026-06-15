@@ -1,9 +1,11 @@
 """Tests for moving average strategy logic."""
 
 import pandas as pd
-
 from trading_backtester.models import Signal
-from trading_backtester.strategy import calculate_moving_average, generate_signal
+from trading_backtester.strategy import (
+    calculate_moving_average,
+    generate_signal,
+)
 
 
 def test_calculate_moving_average_uses_complete_windows():

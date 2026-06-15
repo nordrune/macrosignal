@@ -2,7 +2,6 @@
 
 import pandas as pd
 import pytest
-
 from trading_backtester.data_loader import load_price_data
 
 
@@ -10,10 +9,7 @@ def test_load_price_data_with_valid_csv(tmp_path):
     """Valid CSV data is loaded, converted, and sorted by date."""
     csv_file = tmp_path / "prices.csv"
     csv_file.write_text(
-        "date,close\n"
-        "2024-01-03,102.50\n"
-        "2024-01-01,100.00\n"
-        "2024-01-02,101.25\n",
+        "date,close\n2024-01-03,102.50\n2024-01-01,100.00\n2024-01-02,101.25\n",
         encoding="utf-8",
     )
 
