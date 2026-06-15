@@ -3,8 +3,6 @@
 Educational trading backtester: Litestar API + SvelteKit/Bun dashboard. Simulates SMA/EMA
 strategies on historical prices. No broker integration or live trading.
 
-**License:** [AGPL-3.0](LICENSE) · **Source:** [github.com/nordrune/macrosignal](https://github.com/nordrune/macrosignal)
-
 ## Quick start
 
 Requires [devenv](https://devenv.sh/getting-started/) + [Nix](https://nixos.org/download/).
