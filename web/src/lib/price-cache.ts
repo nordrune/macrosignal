@@ -1,4 +1,4 @@
-/** Client-side Yahoo price cache — one fetch per symbol/period/interval, reused for backtests. */
+/** Client-side Yahoo price cache: one fetch per symbol/period/interval, reused for backtests. */
 
 import { getTicker, type PricePoint } from '$lib/api';
 import type { Interval, Period } from '$lib/types';
@@ -13,7 +13,7 @@ type CacheEntry = {
 const cache = new Map<string, CacheEntry>();
 const inflight = new Map<string, Promise<PricePoint[]>>();
 
-export function tickerCacheKey(symbol: string, period: Period, interval: Interval): string {
+function tickerCacheKey(symbol: string, period: Period, interval: Interval): string {
 	return `${symbol.trim().toUpperCase()}|${period}|${interval}`;
 }
 
@@ -40,12 +40,15 @@ export async function getTickerPrices(
 
 	let pending = inflight.get(key);
 	if (!pending) {
-		pending = getTicker(normalized, period, interval).then((response) => {
-			const prices = response.prices;
-			cache.set(key, { prices, fetchedAt: Date.now() });
-			inflight.delete(key);
-			return prices;
-		});
+		pending = getTicker(normalized, period, interval)
+			.then((response) => {
+				const prices = response.prices;
+				cache.set(key, { prices, fetchedAt: Date.now() });
+				return prices;
+			})
+			.finally(() => {
+				inflight.delete(key);
+			});
 		inflight.set(key, pending);
 	}
 
