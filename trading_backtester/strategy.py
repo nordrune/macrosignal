@@ -12,7 +12,6 @@ from trading_backtester.models import Signal, StrategyType
 
 
 DEFAULT_MOVING_AVERAGE_WINDOW = 20
-DEFAULT_RSI_WINDOW = 14
 SUPPORTED_STRATEGIES = {strategy.value for strategy in StrategyType}
 
 
@@ -21,12 +20,6 @@ def _normalise_strategy_type(strategy_type: str | StrategyType) -> str:
     if isinstance(strategy_type, StrategyType):
         return strategy_type.value
     return str(strategy_type).strip().lower()
-
-
-def _minimum_history_mask(index: pd.Index, min_periods: int) -> pd.Series:
-    """Mark rows that have enough previous points for an indicator."""
-    positions = pd.Series(range(len(index)), index=index)
-    return positions >= (min_periods - 1)
 
 
 def _assign_signals(
@@ -76,59 +69,6 @@ def calculate_ema(
     return close_prices.ewm(span=window, adjust=False).mean()
 
 
-def calculate_rsi(
-    close_prices: pd.Series,
-    window: int = DEFAULT_RSI_WINDOW,
-) -> pd.Series:
-    """Calculate the Relative Strength Index (RSI) using Wilder's smoothing.
-
-    The result is scaled from 0 to 100. The neutral fill value of 50 prevents
-    early missing values from accidentally creating buy or sell signals.
-    """
-    if window < 1:
-        raise ValueError("RSI window must be at least 1.")
-    delta = close_prices.diff()
-    gain = delta.clip(lower=0)
-    loss = -delta.clip(upper=0)
-
-    avg_gain = gain.ewm(alpha=1 / window, adjust=False).mean()
-    avg_loss = loss.ewm(alpha=1 / window, adjust=False).mean()
-
-    rs = avg_gain / avg_loss
-    rsi = 100 - (100 / (1 + rs))
-    return rsi.fillna(50)
-
-
-def calculate_macd(
-    close_prices: pd.Series,
-    fast: int = 12,
-    slow: int = 26,
-    signal_window: int = 9,
-) -> tuple[pd.Series, pd.Series, pd.Series]:
-    """Calculate the MACD line, signal line, and histogram."""
-    if fast < 1 or slow < 1 or signal_window < 1:
-        raise ValueError("MACD windows must be at least 1.")
-    macd_line = calculate_ema(close_prices, fast) - calculate_ema(close_prices, slow)
-    signal_line = macd_line.ewm(span=signal_window, adjust=False).mean()
-    histogram = macd_line - signal_line
-    return macd_line, signal_line, histogram
-
-
-def calculate_bollinger_bands(
-    close_prices: pd.Series,
-    window: int = 20,
-    num_std: float = 2.0,
-) -> tuple[pd.Series, pd.Series, pd.Series]:
-    """Calculate Bollinger Bands as middle, upper, and lower series."""
-    if window < 1:
-        raise ValueError("Bollinger Bands window must be at least 1.")
-    middle_band = calculate_moving_average(close_prices, window)
-    std_dev = close_prices.rolling(window=window, min_periods=window).std()
-    upper_band = middle_band + num_std * std_dev
-    lower_band = middle_band - num_std * std_dev
-    return middle_band, upper_band, lower_band
-
-
 def generate_signal(close_price: float, moving_average: float) -> Signal:
     """Generate a trading signal from the current price and moving average.
 
@@ -160,7 +100,7 @@ def generate_strategy_signals(
         price_data: Data frame with a numeric ``close`` column.
         strategy_type: Strategy to apply.
         **kwargs: Strategy-specific parameters, for example ``window`` for SMA
-            and EMA or ``buy_threshold``/``sell_threshold`` for RSI.
+            and EMA.
 
     Returns:
         Copy of ``price_data`` with indicator columns and a string ``signal`` column.
@@ -194,71 +134,6 @@ def generate_strategy_signals(
             buy_condition=close > data["moving_average"],
             sell_condition=close < data["moving_average"],
         )
-
-    elif strategy == StrategyType.RSI.value:
-        window = kwargs.get("window", DEFAULT_RSI_WINDOW)
-        buy_threshold = kwargs.get("buy_threshold", 30)
-        sell_threshold = kwargs.get("sell_threshold", 70)
-        data["rsi"] = calculate_rsi(close, window)
-        has_history = _minimum_history_mask(close.index, window)
-        _assign_signals(
-            data,
-            buy_condition=has_history & (data["rsi"] < buy_threshold),
-            sell_condition=has_history & (data["rsi"] > sell_threshold),
-        )
-
-    elif strategy == StrategyType.MACD.value:
-        fast = kwargs.get("fast", 12)
-        slow = kwargs.get("slow", 26)
-        signal_window = kwargs.get("signal_window", 9)
-        macd_line, signal_line, hist = calculate_macd(close, fast, slow, signal_window)
-        data["macd_line"] = macd_line
-        data["signal_line"] = signal_line
-        data["macd_histogram"] = hist
-        has_history = _minimum_history_mask(close.index, max(fast, slow))
-        _assign_signals(
-            data,
-            buy_condition=has_history & (macd_line > signal_line),
-            sell_condition=has_history & (macd_line < signal_line),
-        )
-
-    elif strategy == StrategyType.BOLLINGER.value:
-        window = kwargs.get("window", 20)
-        num_std = kwargs.get("num_std", 2.0)
-        middle, upper, lower = calculate_bollinger_bands(close, window, num_std)
-        data["bb_middle"] = middle
-        data["bb_upper"] = upper
-        data["bb_lower"] = lower
-        has_bands = middle.notna()
-        _assign_signals(
-            data,
-            buy_condition=has_bands & (close < lower),
-            sell_condition=has_bands & (close > upper),
-        )
-
-    elif strategy == StrategyType.COMBINED.value:
-        sma_window = kwargs.get("sma_window", 20)
-        rsi_window = kwargs.get("rsi_window", DEFAULT_RSI_WINDOW)
-        buy_threshold = kwargs.get("buy_threshold", 50)
-        sell_threshold = kwargs.get("sell_threshold", 70)
-
-        data["moving_average"] = calculate_moving_average(close, sma_window)
-        data["rsi"] = calculate_rsi(close, rsi_window)
-
-        has_history = _minimum_history_mask(close.index, max(sma_window, rsi_window))
-        buy_condition = (
-            has_history
-            & (close > data["moving_average"])
-            & (data["rsi"] < buy_threshold)
-        )
-        sell_condition = (
-            has_history
-            & (
-                (close < data["moving_average"])
-                | (data["rsi"] > sell_threshold)
-            )
-        )
-        _assign_signals(data, buy_condition, sell_condition)
 
     data["signal"] = data["signal"].apply(lambda s: s.value if hasattr(s, "value") else s)
     return data
