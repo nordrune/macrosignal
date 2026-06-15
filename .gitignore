@@ -64,8 +64,12 @@ devenv.local.yaml
 *.swo
 *~
 
-# Local deploy script
+# Local deploy script (machine-specific host/path)
 deploy.sh
+deploy.local.sh
 
 # Legacy frontend artifacts (removed — keep ignored if recreated locally)
 frontend/
+
+# Editor (local only)
+web/.vscode/
