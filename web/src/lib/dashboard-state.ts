@@ -3,13 +3,28 @@
 import { browser } from '$app/environment';
 import type { BacktestResponse, OptimizeRun } from '$lib/api';
 import type { SimulationAnalytics } from '$lib/analytics';
+import { SAMPLE_CSV } from '$lib/csv';
+import { DEFAULT_FEE_PERCENT, DEFAULT_STARTING_CAPITAL } from '$lib/defaults';
 import type { RunSnapshot } from '$lib/export';
-import type { StrategyType } from '$lib/strategy';
+import { DEFAULT_WINDOW, type StrategyType } from '$lib/strategy';
 import type { DataSource, Interval, Period } from '$lib/types';
 import { INTERVALS, PERIODS } from '$lib/types';
 
 const STORAGE_KEY = 'macrosignal-dashboard';
 const VERSION = 1;
+
+export const DEFAULT_DASHBOARD_SETTINGS: DashboardSettings = {
+	dataSource: 'api',
+	ticker: 'BTC-USD',
+	period: '1y',
+	interval: '1d',
+	csvText: SAMPLE_CSV,
+	strategy: 'sma',
+	windowSize: String(DEFAULT_WINDOW),
+	startingCapital: String(DEFAULT_STARTING_CAPITAL),
+	feeRate: String(DEFAULT_FEE_PERCENT),
+	autoRun: true
+};
 
 export type DashboardSettings = {
 	dataSource: DataSource;

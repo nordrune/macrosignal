@@ -25,7 +25,11 @@
 		type OptimizeRun
 	} from '$lib/api';
 	import { calculateSimulationAnalytics, type SimulationAnalytics } from '$lib/analytics';
-	import { readDashboardState, writeDashboardState } from '$lib/dashboard-state';
+	import {
+		DEFAULT_DASHBOARD_SETTINGS,
+		readDashboardState,
+		writeDashboardState
+	} from '$lib/dashboard-state';
 	import {
 		capPricePoints,
 		DEFAULT_FEE_PERCENT,
@@ -67,6 +71,7 @@
 	import ArrowUpIcon from '@lucide/svelte/icons/arrow-up';
 	import CircleHelpIcon from '@lucide/svelte/icons/circle-help';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
+	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 
 	const TRADE_COLUMNS: { key: TradeSortKey; label: StringKey }[] = [
@@ -173,6 +178,29 @@
 	function schedulePersist() {
 		clearTimeout(persistTimeout);
 		persistTimeout = setTimeout(persistDashboard, 300);
+	}
+
+	function resetSettings() {
+		clearTickerPriceCache();
+		dataSource = DEFAULT_DASHBOARD_SETTINGS.dataSource;
+		ticker = DEFAULT_DASHBOARD_SETTINGS.ticker;
+		period = DEFAULT_DASHBOARD_SETTINGS.period;
+		interval = DEFAULT_DASHBOARD_SETTINGS.interval;
+		csvText = DEFAULT_DASHBOARD_SETTINGS.csvText;
+		strategy = DEFAULT_DASHBOARD_SETTINGS.strategy;
+		windowSize = DEFAULT_DASHBOARD_SETTINGS.windowSize;
+		startingCapital = DEFAULT_DASHBOARD_SETTINGS.startingCapital;
+		feeRate = DEFAULT_DASHBOARD_SETTINGS.feeRate;
+		autoRun = DEFAULT_DASHBOARD_SETTINGS.autoRun;
+		result = null;
+		runSnapshot = null;
+		analytics = null;
+		optimizeRuns = [];
+		selectedPointIndex = null;
+		selectedTradeIndex = null;
+		setStatus(i18n.t('settings.resetDone'), 'info');
+		persistDashboard();
+		scheduleAutoRun();
 	}
 
 	async function buildPayload() {
@@ -378,6 +406,22 @@
 					<Card.CardTitle id="controls-title" class="text-base">
 						{i18n.t('section.settings')}
 					</Card.CardTitle>
+					<Card.CardAction>
+						<Tooltip.Root>
+							<Tooltip.Trigger>
+								<Button
+									variant="ghost"
+									size="icon"
+									class="size-8"
+									aria-label={i18n.t('settings.resetAria')}
+									onclick={resetSettings}
+								>
+									<RefreshCwIcon class="size-4" />
+								</Button>
+							</Tooltip.Trigger>
+							<Tooltip.Content>{i18n.t('settings.resetTooltip')}</Tooltip.Content>
+						</Tooltip.Root>
+					</Card.CardAction>
 				</Card.CardHeader>
 				<Card.CardContent class="space-y-5">
 					<div class="space-y-2">

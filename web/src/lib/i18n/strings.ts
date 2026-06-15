@@ -29,6 +29,9 @@ export const STRINGS = {
 		'export.strategyReturn': 'Strategie-Rendite',
 		'language.aria': 'Sprache wechseln',
 		'section.settings': 'Einstellungen',
+		'settings.resetAria': 'Einstellungen zurücksetzen',
+		'settings.resetTooltip': 'Alle Einstellungen auf Standardwerte zurücksetzen',
+		'settings.resetDone': 'Einstellungen zurückgesetzt',
 		'source.label': 'Datenquelle',
 		'source.tooltip':
 			'Hier wählst du, ob echte historische Marktdaten geladen werden oder ob eine eigene CSV-Datei verwendet wird.',
@@ -222,6 +225,9 @@ export const STRINGS = {
 		'export.strategyReturn': 'Strategy return',
 		'language.aria': 'Change language',
 		'section.settings': 'Settings',
+		'settings.resetAria': 'Reset settings',
+		'settings.resetTooltip': 'Reset all settings to defaults',
+		'settings.resetDone': 'Settings reset to defaults',
 		'source.label': 'Data source',
 		'source.tooltip':
 			'Choose whether to load real historical market data or use your own CSV file.',
