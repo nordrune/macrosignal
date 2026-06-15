@@ -26,6 +26,7 @@ Educational tool; no broker integration.
 - Ponytail minimalism: delete before adding; `# ponytail:` / `// ponytail:` on shortcuts
 - Docs: DOX AGENTS.md tree (not changelog prose in README)
 - Latest reasonable versions; Bun not pnpm/Node
+- Agent skill: `.grok/skills/macrosignal/SKILL.md` (invoke with `/macrosignal`)
 
 ## Child DOX Index
 

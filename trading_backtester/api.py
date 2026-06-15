@@ -224,7 +224,7 @@ async def optimize_strategy(data: OptimizeRequest) -> OptimizeResponse:
         ) from exc
 
 
-# ponytail: API-only app; SvelteKit/Bun serves the dashboard in Phase 2+
+# ponytail: API-only app; SvelteKit/Bun serves the dashboard in web/
 app = Litestar(
     route_handlers=[
         health,

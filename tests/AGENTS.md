@@ -17,7 +17,7 @@ pytest suite + JSON fixtures for API contract and backtester correctness.
 
 ## Local contracts
 
-- Use `litestar.testing.TestClient`, not FastAPI client
+- Use `litestar.testing.TestClient` for HTTP route tests
 - API tests assert JSON keys, not implementation details
 
 ## Verification
