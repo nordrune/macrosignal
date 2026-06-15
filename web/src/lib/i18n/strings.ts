@@ -176,7 +176,7 @@ export const STRINGS = {
 		'trade.roiTooltip':
 			'ROI bedeutet Return on Investment: prozentuale Rendite eines einzelnen Kaufs oder Verkaufs.',
 		'trade.fees': 'Gezahlte Gebühren',
-		footer: 'MacroSignal Dashboard © 2026. Software-Engineering-Projekt.',
+		footer: 'MacroSignal Dashboard © 2026. Nur Simulation — keine Finanzberatung.',
 		'status.running': 'Simulation wird berechnet...',
 		'status.done': 'Simulation abgeschlossen.',
 		'error.capital': 'Das Startkapital muss größer als 0 sein.',
@@ -377,7 +377,7 @@ export const STRINGS = {
 		'trade.roiTooltip':
 			'ROI means Return on Investment: percentage return of a single buy or sell.',
 		'trade.fees': 'Fees paid',
-		footer: 'MacroSignal Dashboard © 2026. Software engineering project.',
+		footer: 'MacroSignal Dashboard © 2026. Simulation only — not financial advice.',
 		'status.running': 'Calculating simulation...',
 		'status.done': 'Simulation completed.',
 		'error.capital': 'Starting capital must be greater than 0.',

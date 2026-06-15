@@ -40,10 +40,10 @@
 	let priceCanvas: HTMLCanvasElement | undefined = $state();
 	let indicatorCanvas: HTMLCanvasElement | undefined = $state();
 	let tooltipEl: HTMLDivElement | undefined = $state();
-	let progress = $state(1);
+	let progress = 1;
 	let chartGeom = $state<ChartGeom | null>(null);
 	let subChartGeom = $state<ChartGeom | null>(null);
-	let animationFrame = $state<number | null>(null);
+	let animationFrame: number | null = null;
 
 	function chartMargin() {
 		if (!browser) return { top: 12, right: 16, bottom: 12, left: 54 };
@@ -154,11 +154,9 @@
 		const closeVals = data.map((d, i) => ({ index: i, value: d.close }));
 		let mainVals = closeVals.map((v) => v.value);
 
-		if (strategy === 'sma' || strategy === 'ema') {
-			data.forEach((d) => {
-				if (d.moving_average !== null) mainVals.push(d.moving_average);
-			});
-		}
+		data.forEach((d) => {
+			if (d.moving_average !== null) mainVals.push(d.moving_average);
+		});
 
 		const minPrice = Math.min(...mainVals);
 		const maxPrice = Math.max(...mainVals);
@@ -192,18 +190,16 @@
 			lineProgress
 		);
 
-		if (strategy === 'sma' || strategy === 'ema') {
-			const maVals = data.map((d, i) => ({ index: i, value: d.moving_average }));
-			drawLine(
-				priceHelpers.ctx,
-				maVals,
-				priceHelpers.xForIdx,
-				priceHelpers.yForVal,
-				'#00e6c3',
-				1.8,
-				lineProgress
-			);
-		}
+		const maVals = data.map((d, i) => ({ index: i, value: d.moving_average }));
+		drawLine(
+			priceHelpers.ctx,
+			maVals,
+			priceHelpers.xForIdx,
+			priceHelpers.yForVal,
+			'#00e6c3',
+			1.8,
+			lineProgress
+		);
 
 		if (selectedTradeIndex !== null && trades[selectedTradeIndex]) {
 			const trade = trades[selectedTradeIndex];
@@ -264,11 +260,14 @@
 		}
 
 		let maxCap = 0;
-		const dds = capitalHistory.map((h) => {
+		const ddVals = capitalHistory.map((h, i) => {
 			if (h.capital > maxCap) maxCap = h.capital;
-			return maxCap === 0 ? 0 : ((h.capital - maxCap) / maxCap) * 100;
+			return {
+				index: i,
+				value: maxCap === 0 ? 0 : ((h.capital - maxCap) / maxCap) * 100
+			};
 		});
-		const subMin = Math.min(...dds, -2);
+		const subMin = Math.min(...ddVals.map((d) => d.value), -2);
 		const subMax = 0.2;
 
 		const subHelpers = getChartHelpers(indicatorCanvas, len, subMin, subMax);
@@ -284,15 +283,6 @@
 			2,
 			(v) => `${v.toFixed(1)}%`
 		);
-
-		maxCap = 0;
-		const ddVals = capitalHistory.map((h, i) => {
-			if (h.capital > maxCap) maxCap = h.capital;
-			return {
-				index: i,
-				value: maxCap === 0 ? 0 : ((h.capital - maxCap) / maxCap) * 100
-			};
-		});
 
 		drawLine(
 			subHelpers.ctx,

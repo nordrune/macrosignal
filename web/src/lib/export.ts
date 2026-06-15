@@ -1,8 +1,8 @@
 /** CSV export from backtest run snapshot — PDF/Excel skipped for ponytail MVP. */
 
 import type { BacktestResponse } from '$lib/api';
-import { formatCurrency } from '$lib/formatters';
-import { getI18n } from '$lib/i18n';
+import { formatCurrency, formatKeyValueParams } from '$lib/formatters';
+import { getI18n, type I18nContext } from '$lib/i18n';
 
 export type RunSnapshot = {
 	dataSource: string;
@@ -28,8 +28,7 @@ function toCsv(rows: unknown[][]): string {
 	return rows.map((row) => row.map(csvCell).join(',')).join('\n');
 }
 
-function getTradeHeaderRow(): string[] {
-	const i18n = getI18n();
+function getTradeHeaderRow(i18n: I18nContext): string[] {
 	return [
 		i18n.t('table.date'),
 		i18n.t('table.action'),
@@ -41,12 +40,9 @@ function getTradeHeaderRow(): string[] {
 }
 
 // ponytail: CSV only — Excel/PDF parity deferred
-export function getExportRows(result: BacktestResponse, snapshot: RunSnapshot) {
+function getExportRows(result: BacktestResponse, snapshot: RunSnapshot) {
 	const i18n = getI18n();
-	const params =
-		Object.entries(snapshot.strategyParams)
-			.map(([key, value]) => `${key}: ${value}`)
-			.join(', ') || '-';
+	const params = formatKeyValueParams(snapshot.strategyParams);
 
 	const parameterRows: unknown[][] = [
 		[i18n.t('export.generatedAt'), new Date().toLocaleString()],
@@ -85,7 +81,7 @@ export function exportCsv(result: BacktestResponse, snapshot: RunSnapshot): void
 		...parameterRows,
 		[],
 		[i18n.t('export.tradesTitle')],
-		getTradeHeaderRow(),
+		getTradeHeaderRow(i18n),
 		...tradeRows
 	];
 	downloadBlob(toCsv(rows), 'macrosignal-export.csv', 'text/csv;charset=utf-8');

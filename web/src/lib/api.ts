@@ -54,11 +54,6 @@ export type BacktestResponse = {
 	trades: Trade[];
 };
 
-export type TickerResponse = {
-	symbol: string;
-	prices: PricePoint[];
-};
-
 export type OptimizeRequest = PriceSourceRequest & {
 	starting_capital?: number;
 	transaction_fee_percent?: number;
@@ -91,11 +86,6 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 		throw new Error(err.detail ?? `Request failed: ${response.status}`);
 	}
 	return response.json() as Promise<T>;
-}
-
-export function getTicker(symbol: string, period = '1y', interval = '1d'): Promise<TickerResponse> {
-	const params = new URLSearchParams({ symbol, period, interval });
-	return apiFetch(`/api/ticker?${params}`);
 }
 
 export function postBacktest(body: BacktestRequest): Promise<BacktestResponse> {

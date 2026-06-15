@@ -6,7 +6,7 @@ from the core backtester so the simulation can also be used from the CLI.
 """
 
 import logging
-from typing import Any
+from typing import Any, NoReturn
 
 import pandas as pd
 import yfinance as yf
@@ -29,6 +29,8 @@ from trading_backtester.dto import (
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+MAX_PRICE_POINTS = 10_000
 
 
 class TickerNotFoundError(ValueError):
@@ -58,8 +60,31 @@ def _normalise_price_frame(data: pd.DataFrame) -> pd.DataFrame:
 
 def _frame_from_price_points(prices: list[PricePoint]) -> pd.DataFrame:
     """Convert uploaded or pasted price points to a validated pandas frame."""
+    if len(prices) > MAX_PRICE_POINTS:
+        raise ValueError(
+            f"At most {MAX_PRICE_POINTS} price points allowed per request."
+        )
     rows = [{"date": point.date, "close": point.close} for point in prices]
     return _normalise_price_frame(pd.DataFrame(rows))
+
+
+def _handle_route_error(
+    exc: Exception,
+    *,
+    validation_log: str,
+    server_log: str,
+    server_prefix: str,
+) -> NoReturn:
+    """Map domain errors to Litestar HTTP responses."""
+    if isinstance(exc, HTTPException):
+        raise exc
+    if isinstance(exc, ValueError):
+        logger.info(validation_log, exc)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    logger.exception(server_log)
+    raise HTTPException(
+        status_code=500, detail=f"{server_prefix}{exc}"
+    ) from exc
 
 
 def _fetch_yahoo_prices(
@@ -184,16 +209,13 @@ async def execute_backtest(data: BacktestRequest) -> BacktestResponse:
             **data.strategy_params,
         )
         return BacktestResponse.from_result(result)
-    except HTTPException:
-        raise
-    except ValueError as exc:
-        logger.info("Validation error in backtest: %s", exc)
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
-        logger.exception("Error running backtest")
-        raise HTTPException(
-            status_code=500, detail=f"Backtester error: {exc}"
-        ) from exc
+        _handle_route_error(
+            exc,
+            validation_log="Validation error in backtest: %s",
+            server_log="Error running backtest",
+            server_prefix="Backtester error: ",
+        )
 
 
 @post("/api/optimize", status_code=HTTP_200_OK)
@@ -212,16 +234,13 @@ async def optimize_strategy(data: OptimizeRequest) -> OptimizeResponse:
             strategy_type=data.strategy_type,
             runs=best_runs,
         )
-    except HTTPException:
-        raise
-    except ValueError as exc:
-        logger.info("Validation error in optimization: %s", exc)
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
-        logger.exception("Error running optimization")
-        raise HTTPException(
-            status_code=500, detail=f"Optimizer error: {exc}"
-        ) from exc
+        _handle_route_error(
+            exc,
+            validation_log="Validation error in optimization: %s",
+            server_log="Error running optimization",
+            server_prefix="Optimizer error: ",
+        )
 
 
 # ponytail: API-only app; SvelteKit/Bun serves the dashboard in web/
