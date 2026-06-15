@@ -30,6 +30,7 @@
 		signedPercent
 	} from '$lib/formatters';
 	import { getI18n } from '$lib/i18n';
+	import { clearTickerPriceCache, getTickerPrices } from '$lib/price-cache';
 	import {
 		DEFAULT_WINDOW,
 		getLegendConfig,
@@ -81,6 +82,9 @@
 	let autoRunTimeout: ReturnType<typeof setTimeout> | undefined;
 	let activeRequestId = 0;
 
+	const TICKER_AUTORUN_MS = 800;
+	const DEFAULT_AUTORUN_MS = 350;
+
 	const legend = $derived(getLegendConfig(strategy));
 	const selectedPoint = $derived(
 		selectedPointIndex !== null ? (result?.series_data[selectedPointIndex] ?? null) : null
@@ -95,13 +99,13 @@
 		return error instanceof Error ? error.message : i18n.t('error.backtest');
 	}
 
-	function scheduleAutoRun() {
-		if (!autoRun) return;
+	function scheduleAutoRun(delayMs = DEFAULT_AUTORUN_MS) {
+		if (!autoRun || isRunning) return;
 		clearTimeout(autoRunTimeout);
-		autoRunTimeout = setTimeout(() => runBacktest(), 350);
+		autoRunTimeout = setTimeout(() => runBacktest(), delayMs);
 	}
 
-	function buildPayload() {
+	async function buildPayload() {
 		const capital = parseFloat(startingCapital);
 		const fee = parseFloat(feeRate);
 		const strategyParams = getStrategyParams(strategy, windowSize);
@@ -118,10 +122,9 @@
 
 		if (dataSource === 'api') {
 			const symbol = ticker.trim().toUpperCase();
-			if (!symbol) throw new Error(i18n.t('error.ticker'));
-			payload.symbol = symbol;
-			payload.period = period;
-			payload.interval = interval;
+			if (symbol.length < 2) return null;
+			// ponytail: cached GET /api/ticker — backtest sends prices[], not symbol
+			payload.prices = await getTickerPrices(symbol, period, interval);
 		} else {
 			payload.prices = parseCsvText(csvText);
 		}
@@ -135,7 +138,12 @@
 		setStatus(i18n.t('status.running'), 'info');
 
 		try {
-			const { payload, strategyParams, capital, fee } = buildPayload();
+			const built = await buildPayload();
+			if (!built) {
+				if (requestId === activeRequestId) isRunning = false;
+				return;
+			}
+			const { payload, strategyParams, capital, fee } = built;
 			const isApi = dataSource === 'api';
 
 			if (isApi) {
@@ -182,7 +190,9 @@
 		setStatus(i18n.t('optimizer.running'), 'info');
 
 		try {
-			const { payload } = buildPayload();
+			const built = await buildPayload();
+			if (!built) return;
+			const { payload } = built;
 			const { strategy_params: _, ...optimizePayload } = payload;
 			const response = await postOptimize(optimizePayload);
 			optimizeRuns = response.runs.slice(0, 5);
@@ -292,7 +302,13 @@
 					<Card.CardTitle>{i18n.t('section.settings')}</Card.CardTitle>
 				</Card.CardHeader>
 				<Card.CardContent class="space-y-6">
-					<Tabs.Tabs bind:value={dataSource} onValueChange={() => scheduleAutoRun()}>
+					<Tabs.Tabs
+						bind:value={dataSource}
+						onValueChange={(value) => {
+							if (value === 'csv') clearTickerPriceCache();
+							scheduleAutoRun();
+						}}
+					>
 						<Tabs.TabsList class="h-auto w-full sm:h-8 sm:w-fit">
 							<Tabs.TabsTrigger value="api" class="min-h-11 flex-1 sm:min-h-0 sm:flex-none"
 								>{i18n.t('source.yahoo')}</Tabs.TabsTrigger
@@ -316,7 +332,7 @@
 								<Input
 									bind:value={ticker}
 									placeholder={i18n.t('ticker.placeholder')}
-									oninput={() => scheduleAutoRun()}
+									oninput={() => scheduleAutoRun(TICKER_AUTORUN_MS)}
 								/>
 							</div>
 							<div class="space-y-2">

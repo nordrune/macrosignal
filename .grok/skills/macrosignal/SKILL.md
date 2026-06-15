@@ -57,10 +57,8 @@ python -m trading_backtester.main data/sample_prices.csv
 
 ## Deferred (do not implement unless asked)
 
-- PWA manifest (removed with legacy `frontend/`)
 - Excel/PDF export (CSV only in `export.ts`)
 - Granian prod API server
-- Yahoo price client cache / auto-run debounce to reduce refetches
 - Splitting `+page.svelte` into many components (only if user requests)
 
 ## Common tasks

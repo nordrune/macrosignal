@@ -12,6 +12,8 @@ SvelteKit 2 dashboard (Svelte 5 runes, TypeScript strict). Bun toolchain. Served
 | `src/routes/+layout.svelte`            | Shell, i18n context, dark theme           |
 | `src/hooks.server.ts`                  | Prod `/api` + `/health` proxy to Litestar |
 | `src/lib/api.ts`                       | Typed fetch client (matches Python DTOs)  |
+| `src/lib/price-cache.ts`               | Yahoo price cache (TTL + in-flight dedup) |
+| `static/site.webmanifest`, `sw.js`     | PWA manifest + shell service worker       |
 | `src/lib/i18n/context.svelte.ts`       | `createContext` i18n (not module store)   |
 | `src/lib/components/PriceChart.svelte` | Canvas charts (ponytail: not Recharts)    |
 | `vite.config.ts`                       | Dev proxy to `API_ORIGIN`                 |
@@ -23,6 +25,7 @@ SvelteKit 2 dashboard (Svelte 5 runes, TypeScript strict). Bun toolchain. Served
 - Svelte 5 runes: `$state`, `$derived`, `$props`; avoid `$effect` except canvas/DOM sync
 - i18n via `getI18n()` from layout context — no global writable store
 - API JSON field names must match `trading_backtester/dto.py`
+- Yahoo mode: `GET /api/ticker` once per symbol/period/interval (client cache), then `POST` with `prices[]`
 - Lint/format: **Oxc stack** (`oxlint`, `oxfmt`) — not ESLint/Prettier
 - Types: `svelte-check` via `bun run typecheck`
 
