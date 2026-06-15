@@ -22,7 +22,7 @@ pytest suite + JSON fixtures for API contract and backtester correctness.
 
 ## Verification
 
-`qa:smoke` curls `POST /api/backtest` and `GET /` on the web dev server (expects `MacroSignal`).
+`qa:smoke` curls `POST /api/backtest` and `GET /` on the web dev server (expects repo URL in footer).
 
 ```bash
 devenv tasks run qa:pytest qa:smoke

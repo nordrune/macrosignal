@@ -10,6 +10,7 @@ description: >
 # MacroSignal
 
 Educational trading backtester: **Litestar API** + **SvelteKit 2 / Bun** dashboard.
+**License:** AGPL-3.0-or-later. **Repo:** https://github.com/nordrune/macrosignal
 
 ## Before editing
 

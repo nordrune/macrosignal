@@ -3,6 +3,7 @@ name = "macrosignal"
 version = "1.0.0"
 description = "Educational trading strategy backtester with a web dashboard"
 readme = "README.md"
+license = { text = "AGPL-3.0-or-later" }
 requires-python = ">=3.12"
 dependencies = [
     "litestar[standard]",
