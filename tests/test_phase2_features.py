@@ -1,34 +1,10 @@
 """Unit tests for Phase 2 macro trading bot features."""
 
 import pandas as pd
-import pytest
 from fastapi.testclient import TestClient
 
 from trading_backtester.api import app
 from trading_backtester.backtester import optimize_strategy_parameters
-from trading_backtester.strategy import generate_strategy_signals
-
-
-def test_generate_strategy_signals_combined():
-    # 5 data points
-    price_data = pd.DataFrame({
-        "date": ["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04", "2024-01-05"],
-        "close": [10.0, 15.0, 20.0, 12.0, 18.0],
-    })
-    
-    # Run Combined strategy
-    res = generate_strategy_signals(
-        price_data,
-        strategy_type="combined",
-        sma_window=2,
-        rsi_window=2,
-        buy_threshold=60,
-        sell_threshold=70
-    )
-    
-    assert "moving_average" in res.columns
-    assert "rsi" in res.columns
-    assert "signal" in res.columns
 
 
 def test_optimize_strategy_parameters():
@@ -68,12 +44,12 @@ def test_api_optimize():
         "prices": prices,
         "starting_capital": 10000.0,
         "transaction_fee_percent": 0.1,
-        "strategy_type": "rsi"
+        "strategy_type": "ema"
     }
     
     response = client.post("/api/optimize", json=payload)
     assert response.status_code == 200
     data = response.json()
-    assert data["strategy_type"] == "rsi"
+    assert data["strategy_type"] == "ema"
     assert "runs" in data
     assert len(data["runs"]) <= 5

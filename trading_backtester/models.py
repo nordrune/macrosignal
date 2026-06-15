@@ -22,10 +22,6 @@ class StrategyType(str, Enum):
 
     SMA = "sma"
     EMA = "ema"
-    RSI = "rsi"
-    MACD = "macd"
-    BOLLINGER = "bollinger"
-    COMBINED = "combined"
 
 
 @dataclass(frozen=True)
