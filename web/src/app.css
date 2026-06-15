@@ -1,0 +1,292 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+	color-scheme: dark;
+	--background: oklch(0.12 0.01 260);
+	--foreground: oklch(0.95 0.01 260);
+	--card: oklch(0.16 0.015 260);
+	--card-foreground: oklch(0.95 0.01 260);
+	--popover: oklch(0.16 0.015 260);
+	--popover-foreground: oklch(0.95 0.01 260);
+	--primary: oklch(0.78 0.14 175);
+	--primary-foreground: oklch(0.15 0.02 260);
+	--secondary: oklch(0.22 0.02 260);
+	--secondary-foreground: oklch(0.9 0.01 260);
+	--muted: oklch(0.22 0.015 260);
+	--muted-foreground: oklch(0.65 0.02 260);
+	--accent: oklch(0.24 0.03 260);
+	--accent-foreground: oklch(0.95 0.01 260);
+	--destructive: oklch(0.6 0.2 25);
+	--border: oklch(0.28 0.02 260);
+	--input: oklch(0.28 0.02 260);
+	--ring: oklch(0.78 0.14 175);
+	--radius: 0.625rem;
+
+	--positive: oklch(0.7 0.17 160);
+	--negative: oklch(0.65 0.2 15);
+	--warning: oklch(0.75 0.15 75);
+
+	--chart-price: var(--foreground);
+	--chart-ma: var(--primary);
+	--chart-buy: var(--positive);
+	--chart-sell: var(--negative);
+	--chart-grid: var(--border);
+	--chart-label: var(--muted-foreground);
+	--chart-marker-stroke: oklch(0.98 0 0);
+	--chart-range: oklch(0.55 0.2 300);
+	--chart-drawdown-fill: color-mix(in oklch, var(--negative) 5%, transparent);
+
+	--bg-image: url('/bg-samurai.jpg');
+	--bg-scrim: linear-gradient(transparent, transparent);
+
+	/* Glass mix knobs — single source of truth for translucent surfaces */
+	--mix-shell: 56%;
+	--mix-card: 40%;
+	--mix-inset: 24%;
+	--mix-control: 14%;
+	--mix-control-active: 20%;
+	--mix-select: 22%;
+	--mix-button: 38%;
+	--mix-button-hover: 48%;
+	--mix-table: 16%;
+	--mix-row-hover: 22%;
+	--mix-row-selected: 30%;
+	--mix-ring: 45%;
+
+	--surface-shell: color-mix(in oklch, var(--background) var(--mix-shell), transparent);
+	--surface-card: color-mix(in oklch, var(--card) var(--mix-card), transparent);
+	--surface-inset: color-mix(in oklch, var(--muted) var(--mix-inset), transparent);
+	--surface-control: color-mix(in oklch, var(--muted) var(--mix-control), transparent);
+	--surface-control-active: color-mix(
+		in oklch,
+		var(--input) var(--mix-control-active),
+		transparent
+	);
+	--surface-select: color-mix(in oklch, var(--input) var(--mix-select), transparent);
+	--surface-button: color-mix(in oklch, var(--primary) var(--mix-button), transparent);
+	--surface-button-hover: color-mix(in oklch, var(--primary) var(--mix-button-hover), transparent);
+	--surface-table: color-mix(in oklch, var(--card) var(--mix-table), transparent);
+	--surface-row-hover: color-mix(in oklch, var(--muted) var(--mix-row-hover), transparent);
+	--surface-row-selected: color-mix(in oklch, var(--muted) var(--mix-row-selected), transparent);
+	--surface-ring: color-mix(in oklch, var(--border) var(--mix-ring), transparent);
+	--surface-shadow: none;
+
+	--tooltip-bg: #000000;
+	--tooltip-fg: #ffffff;
+}
+
+@theme inline {
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-accent: var(--accent);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-destructive: var(--destructive);
+	--color-positive: var(--positive);
+	--color-negative: var(--negative);
+	--color-warning: var(--warning);
+	--color-border: var(--border);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
+	--radius-sm: calc(var(--radius) - 4px);
+	--radius-md: calc(var(--radius) - 2px);
+	--radius-lg: var(--radius);
+	--radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+	* {
+		@apply border-border;
+		scrollbar-width: thin;
+		scrollbar-color: var(--border) transparent;
+	}
+
+	*::-webkit-scrollbar {
+		@apply size-1.5;
+	}
+
+	*::-webkit-scrollbar-track {
+		@apply bg-transparent;
+	}
+
+	*::-webkit-scrollbar-thumb {
+		@apply bg-border rounded-full;
+	}
+
+	*::-webkit-scrollbar-thumb:hover {
+		@apply bg-muted-foreground;
+	}
+
+	html {
+		@apply overflow-x-clip overflow-y-auto;
+		color-scheme: dark;
+		scrollbar-gutter: stable;
+	}
+
+	select,
+	.native-select {
+		@apply h-8 w-full rounded-lg border px-2.5 text-sm outline-none;
+		background: var(--surface-select);
+		border-color: var(--input);
+		color: var(--foreground);
+		color-scheme: dark;
+		accent-color: var(--primary);
+	}
+
+	select:focus-visible,
+	.native-select:focus-visible {
+		border-color: var(--ring);
+		box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 50%, transparent);
+	}
+
+	select option {
+		background-color: var(--popover);
+		color: var(--foreground);
+	}
+
+	body {
+		@apply text-foreground overflow-x-clip antialiased;
+		font-family: system-ui, sans-serif;
+		position: relative;
+		background-color: var(--background);
+		background-image: var(--bg-scrim), var(--bg-image);
+		background-size: cover, cover;
+		background-position: center, center;
+		background-repeat: no-repeat, no-repeat;
+		background-attachment: fixed, fixed;
+	}
+
+	.surface-shell,
+	.surface-card,
+	.surface-inset,
+	.surface-control,
+	.surface-control-active,
+	.surface-table {
+		box-shadow: var(--surface-shadow);
+	}
+
+	.surface-shell {
+		background: var(--surface-shell);
+		border-color: var(--surface-ring);
+		-webkit-backdrop-filter: blur(14px) saturate(1.15);
+		backdrop-filter: blur(14px) saturate(1.15);
+	}
+
+	.surface-card {
+		background: var(--surface-card);
+		border-color: var(--surface-ring);
+		-webkit-backdrop-filter: blur(10px) saturate(1.12);
+		backdrop-filter: blur(10px) saturate(1.12);
+	}
+
+	.surface-inset {
+		background: var(--surface-inset);
+		border-color: var(--surface-ring);
+		-webkit-backdrop-filter: blur(6px) saturate(1.08);
+		backdrop-filter: blur(6px) saturate(1.08);
+	}
+
+	.surface-control {
+		background: var(--surface-control);
+		border-color: var(--surface-ring);
+		-webkit-backdrop-filter: blur(8px) saturate(1.1);
+		backdrop-filter: blur(8px) saturate(1.1);
+	}
+
+	.surface-control-active {
+		background: var(--surface-control-active);
+		border-color: var(--surface-ring);
+		-webkit-backdrop-filter: blur(6px) saturate(1.08);
+		backdrop-filter: blur(6px) saturate(1.08);
+	}
+
+	.surface-button {
+		background: var(--surface-button);
+	}
+
+	.surface-button:hover:not(:disabled),
+	a.surface-button:hover {
+		background: var(--surface-button-hover);
+	}
+
+	.surface-table {
+		background: var(--surface-table);
+		border-color: var(--surface-ring);
+		-webkit-backdrop-filter: blur(8px) saturate(1.1);
+		backdrop-filter: blur(8px) saturate(1.1);
+	}
+
+	.surface-row-selected {
+		background: var(--surface-row-selected);
+	}
+
+	.refresh-pending {
+		transition: opacity 180ms ease;
+	}
+
+	.refresh-pending[data-pending='true'] {
+		opacity: 0.72;
+	}
+
+	@keyframes skeleton-shimmer {
+		from {
+			background-position: 200% 0;
+		}
+		to {
+			background-position: -200% 0;
+		}
+	}
+
+	.skeleton {
+		background-image: linear-gradient(
+			90deg,
+			color-mix(in oklch, var(--muted) 55%, transparent) 0%,
+			color-mix(in oklch, var(--muted) 85%, transparent) 50%,
+			color-mix(in oklch, var(--muted) 55%, transparent) 100%
+		);
+		background-size: 200% 100%;
+		animation: skeleton-shimmer 1.4s ease-in-out infinite;
+	}
+
+	/* Reserved slots — prevents wrap/spinner/status reflow */
+	.stable-status {
+		min-height: 2.5rem;
+	}
+
+	.stable-subtitle {
+		@apply min-h-5 truncate;
+	}
+
+	.stable-value {
+		@apply min-h-7 leading-7 tabular-nums;
+	}
+
+	.stable-label {
+		@apply min-h-8 leading-tight;
+	}
+
+	.stable-icon-slot {
+		@apply inline-flex size-4 shrink-0 items-center justify-center;
+	}
+
+	.stable-header-action {
+		@apply text-muted-foreground inline-flex min-h-5 min-w-[6.5rem] shrink-0 items-center justify-end gap-1.5 text-xs;
+	}
+
+	.tooltip-surface {
+		background: var(--tooltip-bg);
+		color: var(--tooltip-fg);
+	}
+}

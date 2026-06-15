@@ -134,13 +134,3 @@ def generate_strategy_signals(
         )
 
     return data
-
-
-def add_strategy_signals(
-    price_data: pd.DataFrame,
-    window: int = DEFAULT_MOVING_AVERAGE_WINDOW,
-) -> pd.DataFrame:
-    """Add SMA values and signals; kept for older tests and CLI examples."""
-    return generate_strategy_signals(
-        price_data, strategy_type="sma", window=window
-    )

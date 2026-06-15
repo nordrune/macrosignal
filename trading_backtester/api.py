@@ -1,4 +1,4 @@
-"""FastAPI routes for the MacroSignal dashboard.
+"""Litestar routes for the MacroSignal dashboard.
 
 The API accepts either Yahoo Finance ticker settings or custom CSV-derived
 prices from the browser. Route handlers keep validation and loading separate
@@ -6,30 +6,31 @@ from the core backtester so the simulation can also be used from the CLI.
 """
 
 import logging
-import os
-from dataclasses import asdict
-from typing import Any
+from typing import Any, NoReturn
 
 import pandas as pd
 import yfinance as yf
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
-from starlette.datastructures import Headers
-from starlette.responses import Response
-from starlette.staticfiles import StaticFiles
-from starlette.types import Scope
+from litestar import Litestar, get, post
+from litestar.exceptions import HTTPException
+from litestar.status_codes import HTTP_200_OK
 
 from trading_backtester.backtester import (
     optimize_strategy_parameters,
     run_backtest,
 )
-from trading_backtester.models import BacktestResult
+from trading_backtester.dto import (
+    BacktestRequest,
+    BacktestResponse,
+    OptimizeRequest,
+    OptimizeResponse,
+    PricePoint,
+    PriceSourceRequest,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-STRATEGY_DESCRIPTION = "'sma' or 'ema'"
+MAX_PRICE_POINTS = 10_000
 
 
 class TickerNotFoundError(ValueError):
@@ -38,126 +39,6 @@ class TickerNotFoundError(ValueError):
 
 class TickerDataInvalidError(ValueError):
     """Raised when fetched ticker data has no usable close prices."""
-
-
-app = FastAPI(
-    title="MacroSignal API",
-    description="Backend for historical market data and strategy backtesting.",
-    version="1.0.0",
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-class PricePoint(BaseModel):
-    """Single close-price observation sent by the frontend."""
-
-    date: str
-    close: float
-
-
-class PriceSourceRequest(BaseModel):
-    """Shared price-source fields for dashboard endpoints."""
-
-    prices: list[PricePoint] | None = Field(
-        default=None,
-        description="Optional custom price timeseries (for CSV upload).",
-    )
-    symbol: str | None = Field(
-        default=None,
-        description="Yahoo Finance ticker symbol (e.g., 'AAPL', 'BTC-USD').",
-    )
-    period: str = Field(
-        default="1y",
-        description=(
-            "History period to fetch (e.g., '1mo', '3mo', '6mo', '1y', 'max')."
-        ),
-    )
-    interval: str = Field(
-        default="1d", description="Bar interval (e.g., '1h', '1d', '1wk')."
-    )
-
-
-class BacktestRequest(PriceSourceRequest):
-    """Request body for one dashboard backtest run."""
-
-    starting_capital: float = Field(
-        default=10000.0, gt=0, description="Virtual starting capital."
-    )
-    transaction_fee_percent: float = Field(
-        default=0.1,
-        ge=0,
-        description="Transaction fee percentage (0.1 means 0.1%).",
-    )
-    strategy_type: str = Field(
-        default="sma",
-        description=f"Trading strategy type ({STRATEGY_DESCRIPTION}).",
-    )
-    strategy_params: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Key-value parameters for strategy configuration.",
-    )
-
-
-class OptimizeRequest(PriceSourceRequest):
-    """Request body for the parameter search endpoint."""
-
-    starting_capital: float = Field(
-        default=10000.0, gt=0, description="Virtual starting capital."
-    )
-    transaction_fee_percent: float = Field(
-        default=0.1,
-        ge=0,
-        description="Transaction fee percentage (0.1 means 0.1%).",
-    )
-    strategy_type: str = Field(
-        default="sma",
-        description=f"Trading strategy type ({STRATEGY_DESCRIPTION}).",
-    )
-
-
-class BacktestResponse(BaseModel):
-    """Serialised backtest result returned to the dashboard."""
-
-    start_capital: float
-    end_capital: float
-    profit_loss: float
-    profit_loss_percent: float
-    buy_trades: int
-    sell_trades: int
-    final_status: str
-    sharpe_ratio: float
-    max_drawdown: float
-    win_rate: float
-    buy_and_hold_return: float
-    capital_history: list[dict[str, object]]
-    series_data: list[dict[str, object]]
-    trades: list[dict[str, object]]
-
-    @classmethod
-    def from_result(cls, result: BacktestResult) -> "BacktestResponse":
-        """Build an API response from a backtest result dataclass."""
-        return cls.model_validate(asdict(result))
-
-
-class OptimizeResponse(BaseModel):
-    """Top parameter configurations from the optimizer."""
-
-    strategy_type: str
-    runs: list[dict[str, Any]]
-
-
-def _point_to_dict(point: PricePoint) -> dict[str, Any]:
-    """Return a dict for both Pydantic v1 and v2 model instances."""
-    if hasattr(point, "model_dump"):
-        return point.model_dump()
-    return point.dict()
 
 
 def _normalise_price_frame(data: pd.DataFrame) -> pd.DataFrame:
@@ -179,9 +60,31 @@ def _normalise_price_frame(data: pd.DataFrame) -> pd.DataFrame:
 
 def _frame_from_price_points(prices: list[PricePoint]) -> pd.DataFrame:
     """Convert uploaded or pasted price points to a validated pandas frame."""
-    return _normalise_price_frame(
-        pd.DataFrame([_point_to_dict(point) for point in prices])
-    )
+    if len(prices) > MAX_PRICE_POINTS:
+        raise ValueError(
+            f"At most {MAX_PRICE_POINTS} price points allowed per request."
+        )
+    rows = [{"date": point.date, "close": point.close} for point in prices]
+    return _normalise_price_frame(pd.DataFrame(rows))
+
+
+def _handle_route_error(
+    exc: Exception,
+    *,
+    validation_log: str,
+    server_log: str,
+    server_prefix: str,
+) -> NoReturn:
+    """Map domain errors to Litestar HTTP responses."""
+    if isinstance(exc, HTTPException):
+        raise exc
+    if isinstance(exc, ValueError):
+        logger.info(validation_log, exc)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    logger.exception(server_log)
+    raise HTTPException(
+        status_code=500, detail=f"{server_prefix}{exc}"
+    ) from exc
 
 
 def _fetch_yahoo_prices(
@@ -243,6 +146,8 @@ def _fetch_yahoo_prices(
                 "close": float(row["close"]),
             }
         )
+    if len(records) > MAX_PRICE_POINTS:
+        records = records[-MAX_PRICE_POINTS:]
     return {"symbol": symbol.upper(), "prices": records}
 
 
@@ -263,8 +168,14 @@ def _load_price_frame(source: PriceSourceRequest) -> pd.DataFrame:
     )
 
 
-@app.get("/api/ticker")
-def get_ticker_data(
+@get("/health")
+async def health() -> dict[str, str]:
+    """Liveness probe for devenv and deploy health checks."""
+    return {"status": "ok"}
+
+
+@get("/api/ticker")
+async def get_ticker_data(
     symbol: str,
     period: str = "1y",
     interval: str = "1d",
@@ -286,102 +197,61 @@ def get_ticker_data(
         ) from exc
 
 
-@app.post("/api/backtest")
-def execute_backtest(request: BacktestRequest) -> BacktestResponse:
+@post("/api/backtest", status_code=HTTP_200_OK)
+async def execute_backtest(data: BacktestRequest) -> BacktestResponse:
     """Run a multi-strategy backtest on fetched or uploaded price data."""
     try:
-        price_frame = _load_price_frame(request)
-        fee_rate = request.transaction_fee_percent / 100.0
+        price_frame = _load_price_frame(data)
+        fee_rate = data.transaction_fee_percent / 100.0
         result = run_backtest(
             price_data=price_frame,
-            starting_capital=request.starting_capital,
+            starting_capital=data.starting_capital,
             transaction_fee_rate=fee_rate,
-            strategy_type=request.strategy_type,
-            **request.strategy_params,
+            strategy_type=data.strategy_type,
+            **data.strategy_params,
+        )
+        return BacktestResponse.from_result(result)
+    except Exception as exc:
+        _handle_route_error(
+            exc,
+            validation_log="Validation error in backtest: %s",
+            server_log="Error running backtest",
+            server_prefix="Backtester error: ",
         )
 
-        return BacktestResponse.from_result(result)
 
-    except HTTPException:
-        raise
-    except ValueError as exc:
-        logger.info("Validation error in backtest: %s", exc)
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception as exc:
-        logger.exception("Error running backtest")
-        raise HTTPException(
-            status_code=500, detail=f"Backtester error: {exc}"
-        ) from exc
-
-
-@app.post("/api/optimize")
-def optimize_strategy(request: OptimizeRequest) -> OptimizeResponse:
+@post("/api/optimize", status_code=HTTP_200_OK)
+async def optimize_strategy(data: OptimizeRequest) -> OptimizeResponse:
     """Run a parameter sweep and return the top five configurations."""
     try:
-        price_frame = _load_price_frame(request)
-        fee_rate = request.transaction_fee_percent / 100.0
+        price_frame = _load_price_frame(data)
+        fee_rate = data.transaction_fee_percent / 100.0
         best_runs = optimize_strategy_parameters(
             price_data=price_frame,
-            starting_capital=request.starting_capital,
+            starting_capital=data.starting_capital,
             transaction_fee_rate=fee_rate,
-            strategy_type=request.strategy_type,
+            strategy_type=data.strategy_type,
         )
-
         return OptimizeResponse(
-            strategy_type=request.strategy_type,
+            strategy_type=data.strategy_type,
             runs=best_runs,
         )
-
-    except HTTPException:
-        raise
-    except ValueError as exc:
-        logger.info("Validation error in optimization: %s", exc)
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
-        logger.exception("Error running optimization")
-        raise HTTPException(
-            status_code=500, detail=f"Optimizer error: {exc}"
-        ) from exc
-
-
-class NoCacheStaticFiles(StaticFiles):
-    """Serve frontend assets without long-lived browser caching."""
-
-    _NO_CACHE = "no-store, no-cache, must-revalidate, max-age=0"
-
-    def is_not_modified(
-        self,
-        response_headers: Headers,
-        request_headers: Headers,
-    ) -> bool:
-        _ = (response_headers, request_headers)
-        return False
-
-    def file_response(
-        self,
-        full_path: str | os.PathLike[str],
-        stat_result: os.stat_result,
-        scope: Scope,
-        status_code: int = 200,
-    ) -> Response:
-        response = super().file_response(
-            full_path, stat_result, scope, status_code=status_code
+        _handle_route_error(
+            exc,
+            validation_log="Validation error in optimization: %s",
+            server_log="Error running optimization",
+            server_prefix="Optimizer error: ",
         )
-        response.headers["Cache-Control"] = self._NO_CACHE
-        response.headers["Pragma"] = "no-cache"
-        response.headers["Expires"] = "0"
-        return response
 
 
-try:
-    app.mount(
-        "/",
-        NoCacheStaticFiles(directory="frontend", html=True),
-        name="static",
-    )
-except Exception as exc:
-    logger.warning(
-        "Could not mount static files directory: %s. "
-        "API endpoints remain active.",
-        exc,
-    )
+# ponytail: API-only app; SvelteKit/Bun serves the dashboard in web/
+app = Litestar(
+    route_handlers=[
+        health,
+        get_ticker_data,
+        execute_backtest,
+        optimize_strategy,
+    ],
+    openapi_config=None,
+)

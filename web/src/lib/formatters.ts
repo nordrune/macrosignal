@@ -1,0 +1,36 @@
+/** Shared display formatting helpers. */
+
+export function formatCurrency(value: number): string {
+	return new Intl.NumberFormat('en-US', {
+		style: 'currency',
+		currency: 'USD'
+	}).format(value);
+}
+
+export function hasNumber(value: unknown): boolean {
+	return value !== null && value !== undefined && Number.isFinite(Number(value));
+}
+
+export function signedCurrency(value: number): string {
+	const prefix = value > 0 ? '+' : '';
+	return `${prefix}${formatCurrency(value)}`;
+}
+
+export function signedPercent(value: number): string {
+	const prefix = value > 0 ? '+' : '';
+	return `${prefix}${value.toFixed(2)}%`;
+}
+
+export function formatKeyValueParams(params: Record<string, number>): string {
+	return (
+		Object.entries(params)
+			.map(([key, value]) => `${key}: ${value}`)
+			.join(', ') || '-'
+	);
+}
+
+export function valueTone(value: number): '' | 'positive' | 'negative' {
+	if (value > 0) return 'positive';
+	if (value < 0) return 'negative';
+	return '';
+}
