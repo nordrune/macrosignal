@@ -6,25 +6,22 @@ easy to explain in the dashboard and predictable for unit tests.
 """
 
 from datetime import time
+from typing import Any
 
 import pandas as pd
 
-from trading_backtester.models import BacktestResult, StrategyType
+from trading_backtester.models import (
+    BacktestResult,
+    StrategyType,
+    normalize_strategy_type,
+)
 from trading_backtester.strategy import (
     DEFAULT_MOVING_AVERAGE_WINDOW,
     generate_strategy_signals,
 )
 
-
 STARTING_CAPITAL = 10_000.0
 TRANSACTION_FEE_RATE = 0.001
-
-
-def _strategy_value(strategy_type: str | StrategyType) -> str:
-    """Return a normalised strategy key accepted by the signal generator."""
-    if isinstance(strategy_type, StrategyType):
-        return strategy_type.value
-    return str(strategy_type).strip().lower()
 
 
 def _format_date(value: object) -> str:
@@ -36,26 +33,29 @@ def _format_date(value: object) -> str:
     return str(value)
 
 
-def _serialise_strategy_data(strategy_data: pd.DataFrame) -> list[dict[str, object]]:
+def _serialise_strategy_data(
+    strategy_data: pd.DataFrame,
+) -> list[dict[str, object]]:
     """Convert pandas rows to JSON-friendly records for the API and frontend."""
     records: list[dict[str, object]] = []
     for _, row in strategy_data.iterrows():
         record: dict[str, object] = {}
         for key, value in row.items():
-            if key == "date":
-                record[key] = _format_date(value)
+            column = str(key)
+            if column == "date":
+                record[column] = _format_date(value)
             elif pd.isna(value):
-                record[key] = None
+                record[column] = None
             elif hasattr(value, "item"):
-                record[key] = value.item()
+                record[column] = value.item()
             else:
-                record[key] = value
+                record[column] = value
         records.append(record)
     return records
 
 
-def _parameter_grid(strategy_type: str) -> list[dict[str, int | float]]:
-    """Return the finite parameter grid used by the optimizer for one strategy."""
+def _parameter_grid(strategy_type: str) -> list[dict[str, int]]:
+    """Return the parameter grid used by the optimizer for one strategy."""
     if strategy_type in {StrategyType.SMA.value, StrategyType.EMA.value}:
         return [{"window": window} for window in range(5, 101, 5)]
 
@@ -68,7 +68,7 @@ def run_backtest(
     transaction_fee_rate: float = TRANSACTION_FEE_RATE,
     moving_average_window: int = DEFAULT_MOVING_AVERAGE_WINDOW,
     strategy_type: str | StrategyType = StrategyType.SMA,
-    **strategy_kwargs,
+    **strategy_kwargs: Any,
 ) -> BacktestResult:
     """Run a backtest on historical price data with the chosen strategy.
 
@@ -77,15 +77,15 @@ def run_backtest(
     asset position back into cash.
 
     Args:
-        price_data: Data frame containing at least a ``close`` and ``date`` column.
+        price_data: Data frame with at least ``close`` and ``date`` columns.
         starting_capital: Initial virtual cash balance.
         transaction_fee_rate: Fee rate applied to each buy or sell transaction.
-        moving_average_window: Window used by the moving average strategy (fallback).
+        moving_average_window: SMA window fallback when none is provided.
         strategy_type: Strategy to run.
         **strategy_kwargs: Arguments passed to the strategy signals generator.
 
     Returns:
-        A ``BacktestResult`` with final performance and historical timeseries values.
+        A ``BacktestResult`` with final performance and timeseries values.
     """
     if price_data.empty:
         raise ValueError("Price data must contain at least one row.")
@@ -94,8 +94,11 @@ def run_backtest(
     if transaction_fee_rate < 0:
         raise ValueError("Transaction fee rate cannot be negative.")
 
-    strategy_key = _strategy_value(strategy_type)
-    if strategy_key == StrategyType.SMA.value and "window" not in strategy_kwargs:
+    strategy_key = normalize_strategy_type(strategy_type)
+    if (
+        strategy_key == StrategyType.SMA.value
+        and "window" not in strategy_kwargs
+    ):
         strategy_kwargs["window"] = moving_average_window
 
     strategy_data = generate_strategy_signals(
@@ -109,17 +112,16 @@ def run_backtest(
     buy_trades = 0
     sell_trades = 0
 
-    trades_log = []
-    daily_portfolio_values = []
+    trades_log: list[dict[str, object]] = []
+    daily_portfolio_values: list[dict[str, object]] = []
     trade_profits = []
     cash_before_buy = starting_capital
 
-    for row in strategy_data.itertuples(index=False):
-        close_price = float(row.close)
+    for _, row in strategy_data.iterrows():
+        close_price = float(row["close"])
+        date_str = _format_date(row["date"])
 
-        date_str = _format_date(row.date)
-
-        if row.signal == "buy" and asset_units == 0:
+        if row["signal"] == "buy" and asset_units == 0:
             cash_before_buy = cash_balance
             fee = cash_balance * transaction_fee_rate
             investable_cash = cash_balance - fee
@@ -137,7 +139,7 @@ def run_backtest(
                     "cashBalance": cash_balance,
                 }
             )
-        elif row.signal == "sell" and asset_units > 0:
+        elif row["signal"] == "sell" and asset_units > 0:
             gross_sale_value = asset_units * close_price
             fee = gross_sale_value * transaction_fee_rate
             sold_units = asset_units
@@ -183,20 +185,30 @@ def run_backtest(
     cap_series = pd.Series([item["capital"] for item in daily_portfolio_values])
     daily_returns = cap_series.pct_change().dropna()
     if len(daily_returns) > 1 and daily_returns.std() > 0:
-        sharpe_ratio = float((daily_returns.mean() / daily_returns.std()) * (252 ** 0.5))
+        sharpe_ratio = float(
+            (daily_returns.mean() / daily_returns.std()) * (252**0.5)
+        )
     else:
         sharpe_ratio = 0.0
 
     peaks = cap_series.cummax()
     drawdowns = (cap_series - peaks) / peaks
-    max_drawdown = float(abs(drawdowns.min()) * 100) if not drawdowns.empty else 0.0
+    max_drawdown = (
+        float(abs(drawdowns.min()) * 100) if not drawdowns.empty else 0.0
+    )
 
     profitable_trades = sum(1 for p in trade_profits if p > 0)
     total_trades_count = len(trade_profits)
-    win_rate = (profitable_trades / total_trades_count) * 100 if total_trades_count > 0 else 0.0
+    win_rate = (
+        (profitable_trades / total_trades_count) * 100
+        if total_trades_count > 0
+        else 0.0
+    )
 
     first_close_price = float(price_data.iloc[0]["close"])
-    buy_and_hold_return = ((last_close_price - first_close_price) / first_close_price) * 100
+    buy_and_hold_return = (
+        (last_close_price - first_close_price) / first_close_price
+    ) * 100
 
     return BacktestResult(
         start_capital=starting_capital,
@@ -240,14 +252,14 @@ def optimize_strategy_parameters(
     starting_capital: float = STARTING_CAPITAL,
     transaction_fee_rate: float = TRANSACTION_FEE_RATE,
     strategy_type: str | StrategyType = StrategyType.SMA,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Return the top five parameter combinations for the selected strategy.
 
     The optimizer is a deterministic grid search. It is intentionally limited
     to small grids so that students can understand the search space and the
     dashboard can respond quickly on typical local machines.
     """
-    strategy_key = _strategy_value(strategy_type)
+    strategy_key = normalize_strategy_type(strategy_type)
     runs = []
 
     for params in _parameter_grid(strategy_key):
@@ -271,6 +283,8 @@ def optimize_strategy_parameters(
             }
         )
 
-    runs.sort(key=lambda r: (r["profit_loss_percent"], r["sharpe_ratio"]), reverse=True)
+    runs.sort(
+        key=lambda r: (r["profit_loss_percent"], r["sharpe_ratio"]),
+        reverse=True,
+    )
     return runs[:5]
-
