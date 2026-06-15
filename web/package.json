@@ -1,0 +1,45 @@
+{
+	"name": "web",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"preview": "vite preview",
+		"prepare": "svelte-kit sync || echo ''",
+		"lint": "oxlint .",
+		"lint:fix": "oxlint --fix .",
+		"format": "oxfmt --check .",
+		"format:fix": "oxfmt .",
+		"typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check": "bun run format && bun run lint && bun run typecheck",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"qa": "bun run format && bun run lint && bun run typecheck",
+		"qa:fix": "bun run format:fix && bun run lint:fix"
+	},
+	"dependencies": {
+		"@lucide/svelte": "^1.17.0",
+		"bits-ui": "^2.18.1",
+		"clsx": "^2.1.1",
+		"tailwind-merge": "^3.6.0",
+		"tailwind-variants": "^3.2.2",
+		"tw-animate-css": "^1.4.0"
+	},
+	"devDependencies": {
+		"@internationalized/date": "^3.12.0",
+		"@sveltejs/adapter-auto": "^7.0.1",
+		"@sveltejs/kit": "^2.57.0",
+		"@sveltejs/vite-plugin-svelte": "^7.0.0",
+		"@tailwindcss/vite": "^4.3.0",
+		"@types/node": "^25.9.1",
+		"oxfmt": "^0.53.0",
+		"oxlint": "^1.68.0",
+		"svelte": "^5.55.2",
+		"svelte-adapter-bun": "^1.0.1",
+		"svelte-check": "^4.4.6",
+		"tailwindcss": "^4.3.0",
+		"typescript": "^6.0.2",
+		"vite": "^8.0.7"
+	}
+}

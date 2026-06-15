@@ -15,7 +15,8 @@ Educational tool; no broker integration.
 - DTOs live in `trading_backtester/dto.py` (msgspec); domain logic stays framework-free
 - Frontend: SvelteKit 2 in `web/`; Bun package manager; `svelte-adapter-bun` for prod
 - Dev: `devenv up` runs API (`:41793`) + SvelteKit (`:5173`); browser uses `:5173`
-- Do not run `devenv up` and `devenv test` concurrently (both bind API port)
+- Do not run `devenv up` and `devenv test` concurrently (API port conflict)
+- Web QA: Oxc (`oxlint` + `oxfmt`) + `svelte-check`; Python QA: `ruff` + `ty`
 
 ## User preferences
 
