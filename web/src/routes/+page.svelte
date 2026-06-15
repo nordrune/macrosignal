@@ -72,7 +72,7 @@
 	import ArrowUpIcon from '@lucide/svelte/icons/arrow-up';
 	import CircleHelpIcon from '@lucide/svelte/icons/circle-help';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
-	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
+	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 
 	const TRADE_COLUMNS: { key: TradeSortKey; label: StringKey }[] = [
@@ -419,7 +419,7 @@
 									aria-label={i18n.t('settings.resetAria')}
 									onclick={resetSettings}
 								>
-									<RefreshCwIcon class="size-4" />
+									<RotateCcwIcon class="size-4" />
 								</Button>
 							</Tooltip.Trigger>
 							<Tooltip.Content>{i18n.t('settings.resetTooltip')}</Tooltip.Content>
