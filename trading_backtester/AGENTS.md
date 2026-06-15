@@ -21,6 +21,7 @@ Python package: price loading, strategy signals, backtest simulation, Litestar H
 - Route handler body params must not be named `request` (Litestar injects HTTP Request)
 - POST routes return HTTP 200 (not Litestar default 201)
 - Price source: either `prices[]` or `symbol` + Yahoo fetch
+- Price frames: `polars.DataFrame` with `date` + `close`; yfinance boundary extracts rows without importing pandas
 - CLI CSV path must remain unchanged for `python -m trading_backtester.main`
 
 ## Work guidance

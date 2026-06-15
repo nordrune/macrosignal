@@ -1,20 +1,20 @@
 """Unit tests for Phase 2 macro trading bot features."""
 
-import pandas as pd
+import polars as pl
 from litestar.testing import TestClient
 from trading_backtester.api import app
 from trading_backtester.backtester import optimize_strategy_parameters
 
 
 def test_optimize_strategy_parameters():
-    price_data = pd.DataFrame(
+    price_data = pl.DataFrame(
         {
             "date": [f"2024-01-{i:02d}" for i in range(1, 21)],
             "close": [
                 10.0 + (i % 3) * 2.0 - (i % 2) * 1.0 for i in range(1, 21)
             ],
         }
-    )
+    ).with_columns(pl.col("date").str.to_datetime())
 
     runs = optimize_strategy_parameters(
         price_data=price_data,
