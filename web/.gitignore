@@ -26,3 +26,6 @@ vite.config.ts.timestamp-*
 
 # Test / coverage
 coverage/
+
+# Devenv / tooling caches under web/
+.cache/
