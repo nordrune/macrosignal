@@ -60,6 +60,59 @@ def test_api_ticker_not_found_returns_404():
     assert response.status_code == 404
 
 
+def test_health_returns_ok():
+    with TestClient(app=app) as client:
+        response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+def test_api_backtest_response_full_schema():
+    payload = json.loads(FIXTURE.read_text())
+    with TestClient(app=app) as client:
+        response = client.post("/api/backtest", json=payload)
+
+    assert response.status_code == 200
+    data = response.json()
+    for key in (
+        "start_capital",
+        "end_capital",
+        "profit_loss",
+        "profit_loss_percent",
+        "buy_trades",
+        "sell_trades",
+        "final_status",
+        "sharpe_ratio",
+        "max_drawdown",
+        "win_rate",
+        "buy_and_hold_return",
+        "capital_history",
+        "series_data",
+        "trades",
+    ):
+        assert key in data
+
+    trade = data["trades"][0]
+    for key in ("date", "type", "price", "units", "fee", "cashBalance"):
+        assert key in trade
+
+    series_point = data["series_data"][0]
+    for key in ("date", "close", "signal", "moving_average"):
+        assert key in series_point
+
+    capital_point = data["capital_history"][0]
+    for key in ("date", "capital"):
+        assert key in capital_point
+
+
+def test_api_optimize_missing_source_returns_400():
+    with TestClient(app=app) as client:
+        response = client.post("/api/optimize", json={"strategy_type": "sma"})
+
+    assert response.status_code == 400
+
+
 def test_api_ticker_success():
     index = pd.DatetimeIndex(pd.to_datetime(["2024-01-01", "2024-01-02"]))
     index.name = "Date"

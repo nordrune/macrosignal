@@ -17,7 +17,8 @@
 		"typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check": "bun run format && bun run lint && bun run typecheck",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-		"qa": "bun run format && bun run lint && bun run typecheck",
+		"test": "bun test",
+		"qa": "bun run format && bun run lint && bun run typecheck && bun test",
 		"qa:fix": "bun run format:fix && bun run lint:fix"
 	},
 	"dependencies": {
