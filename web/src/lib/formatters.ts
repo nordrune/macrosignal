@@ -21,14 +21,16 @@ export function signedPercent(value: number): string {
 	return `${prefix}${value.toFixed(2)}%`;
 }
 
-export function pnlClass(value: number): string {
-	return value >= 0 ? 'text-emerald-400' : 'text-rose-400';
-}
-
 export function formatKeyValueParams(params: Record<string, number>): string {
 	return (
 		Object.entries(params)
 			.map(([key, value]) => `${key}: ${value}`)
 			.join(', ') || '-'
 	);
+}
+
+export function valueTone(value: number): '' | 'positive' | 'negative' {
+	if (value > 0) return 'positive';
+	if (value < 0) return 'negative';
+	return '';
 }
