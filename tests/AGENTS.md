@@ -8,7 +8,7 @@ pytest suite + JSON fixtures for API contract and backtester correctness.
 
 | File | Covers |
 |------|--------|
-| `test_api_contract.py` | Litestar `/api/backtest` + `/api/ticker` (mocked yfinance) |
+| `test_api_contract.py` | `/health`, `/api/backtest` schema, `/api/optimize` 400, `/api/ticker` (mocked yfinance) |
 | `test_phase2_features.py` | Optimizer unit + `/api/optimize` |
 | `test_backtester*.py` | Simulation accounting |
 | `test_strategy*.py` | Indicators and signals |

@@ -137,7 +137,7 @@ in
       after = [ "qa:web:lint" ];
       before = [ "devenv:enterTest" ];
     };
-    # Manual aliases — not part of devenv test (individual qa:web:* tasks already run)
+    # Manual aliases, not part of devenv test (individual qa:web:* tasks already run)
     "qa:web" = {
       exec = qaWeb;
       after = [ "qa:web:typecheck" ];
@@ -175,7 +175,7 @@ in
     echo "  devenv up api              # API only"
     echo "  devenv up web              # SvelteKit only (needs API running)"
     echo "  ENV=prod devenv up api     # production-style API (no reload)"
-    echo "  devenv test                # full QA (kill devenv up first — port ${toString apiPort})"
+    echo "  devenv test                # full QA (kill devenv up first; port ${toString apiPort})"
     echo "  devenv tasks run qa:web    # web oxfmt + oxlint + svelte-check"
     echo "  devenv tasks run build:web # production web build"
     echo "  git push runs devenv test (pre-push hook)"

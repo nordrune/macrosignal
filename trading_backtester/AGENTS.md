@@ -37,4 +37,4 @@ python -m trading_backtester.main data/sample_prices.csv
 
 ## Child DOX Index
 
-(none — flat package)
+(none, flat package)
