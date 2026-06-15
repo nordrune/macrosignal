@@ -5,7 +5,6 @@ all-in buys, all-out sells, and a fixed transaction fee. That makes the result
 easy to explain in the dashboard and predictable for unit tests.
 """
 
-import itertools
 from datetime import time
 
 import pandas as pd
@@ -59,49 +58,6 @@ def _parameter_grid(strategy_type: str) -> list[dict[str, int | float]]:
     """Return the finite parameter grid used by the optimizer for one strategy."""
     if strategy_type in {StrategyType.SMA.value, StrategyType.EMA.value}:
         return [{"window": window} for window in range(5, 101, 5)]
-
-    if strategy_type == StrategyType.RSI.value:
-        return [
-            {"window": window, "buy_threshold": buy, "sell_threshold": sell}
-            for window, buy, sell in itertools.product(
-                [10, 14, 20],
-                [25, 30, 35],
-                [65, 70, 75],
-            )
-        ]
-
-    if strategy_type == StrategyType.MACD.value:
-        return [
-            {"fast": fast, "slow": slow, "signal_window": signal_window}
-            for fast, slow, signal_window in itertools.product(
-                [8, 12, 16],
-                [20, 26, 32],
-                [7, 9, 11],
-            )
-            if fast < slow
-        ]
-
-    if strategy_type == StrategyType.BOLLINGER.value:
-        return [
-            {"window": window, "num_std": num_std}
-            for window, num_std in itertools.product([10, 20, 30, 40], [1.5, 2.0, 2.5])
-        ]
-
-    if strategy_type == StrategyType.COMBINED.value:
-        return [
-            {
-                "sma_window": sma_window,
-                "rsi_window": rsi_window,
-                "buy_threshold": buy,
-                "sell_threshold": sell,
-            }
-            for sma_window, rsi_window, buy, sell in itertools.product(
-                [10, 20, 30],
-                [10, 14],
-                [40, 50],
-                [65, 70, 75],
-            )
-        ]
 
     raise ValueError(f"Cannot optimize unknown strategy: {strategy_type}")
 
