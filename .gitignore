@@ -64,9 +64,9 @@ devenv.local.yaml
 *.swo
 *~
 
-# Local deploy script (machine-specific host/path)
+# Local deploy/runtime scripts (machine-specific host/path)
 deploy.sh
-deploy.local.sh
+scripts/prod.sh
 
 # Legacy frontend artifacts (removed — keep ignored if recreated locally)
 frontend/

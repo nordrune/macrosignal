@@ -8,6 +8,7 @@ export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
 	server: {
 		port: Number(process.env.WEB_PORT ?? 5173),
+		allowedHosts: ['macrosignal.berserkresults.com'],
 		proxy: {
 			// ponytail: dev-only proxy; prod uses hooks.server.ts
 			'/api': { target: apiOrigin, changeOrigin: true },

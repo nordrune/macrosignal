@@ -3,17 +3,14 @@
 let
   apiPort = 41793;
   webPort = 5173;
+  hasWeb = builtins.pathExists ./web/package.json;
   uvRun = "env -u VIRTUAL_ENV uv run";
   qaFormat = "${uvRun} ruff format .";
   qaLint = "${uvRun} ruff check .";
   qaTypecheck = "${uvRun} ty check";
   qaPytest = "${uvRun} pytest";
   isTesting = config.devenv.isTesting;
-  litestarApp = ''
-    ${uvRun} litestar --app trading_backtester.api:app run \
-      --host "$HOST" \
-      --port "$API_PORT"
-  '';
+  prodScript = "./scripts/prod.sh";
   webDir = "web";
   webRun = "cd ${webDir} && bun run";
   qaWebFormat = "${webRun} format";
@@ -28,11 +25,10 @@ in
   delta.enable = true;
 
   packages = [
-    pkgs.bun
     pkgs.cacert
     pkgs.curl
     pkgs.tokei
-  ];
+  ] ++ lib.optionals hasWeb [ pkgs.bun ];
 
   languages.python = {
     enable = true;
@@ -47,7 +43,7 @@ in
     };
   };
 
-  languages.javascript = {
+  languages.javascript = lib.mkIf hasWeb {
     enable = true;
     directory = webDir;
     bun = {
@@ -61,19 +57,13 @@ in
     API_PORT = toString apiPort;
     WEB_PORT = toString webPort;
     API_ORIGIN = "http://127.0.0.1:${toString apiPort}";
-    PORT = toString apiPort;
+    PORT = toString webPort;
+    BUN_TMPDIR = "/tmp/bun-macrosignal";
     ENV = lib.mkDefault "dev";
   };
 
   processes.api = {
-    exec = ''
-      if [ "$ENV" = prod ]; then
-        ${litestarApp}
-      else
-        ${litestarApp} \
-          ${lib.optionalString (!isTesting) "--reload"}
-      fi
-    '';
+    exec = "${prodScript} api \"\${ENV:-dev}\"";
     ready = {
       http.get = {
         host = "127.0.0.1";
@@ -86,7 +76,7 @@ in
   };
 
   processes.web = {
-    exec = "cd ${webDir} && bun --bun run dev --port \"$WEB_PORT\" --host \"$HOST\"";
+    exec = "${prodScript} web \"\${ENV:-dev}\"";
     ready = {
       http.get = {
         host = "127.0.0.1";
@@ -133,31 +123,32 @@ in
       after = [ "qa:lint" ];
       before = [ "devenv:enterTest" ];
     };
-    "qa:web:format" = {
+    "qa:web:format" = lib.mkIf hasWeb {
       exec = qaWebFormat;
       before = [ "devenv:enterTest" ];
     };
-    "qa:web:lint" = {
+    "qa:web:lint" = lib.mkIf hasWeb {
       exec = qaWebLint;
       after = [ "qa:web:format" ];
       before = [ "devenv:enterTest" ];
     };
-    "qa:web:typecheck" = {
+    "qa:web:typecheck" = lib.mkIf hasWeb {
       exec = qaWebTypecheck;
       after = [ "qa:web:lint" ];
       before = [ "devenv:enterTest" ];
     };
-    # Manual aliases, not part of devenv test (individual qa:web:* tasks already run)
-    "qa:web" = {
+    "qa:web" = lib.mkIf hasWeb {
       exec = qaWeb;
       after = [ "qa:web:typecheck" ];
     };
-    "build:web" = {
+    "build:web" = lib.mkIf hasWeb {
       exec = webBuild;
     };
     "qa:pytest" = {
       exec = qaPytest;
-      after = [ "qa:typecheck" "qa:web:typecheck" ];
+      after =
+        [ "qa:typecheck" ]
+        ++ lib.optionals hasWeb [ "qa:web:typecheck" ];
       before = [ "devenv:enterTest" ];
     };
     "qa:smoke" = {
@@ -178,14 +169,15 @@ in
   };
 
   enterShell = ''
-    echo "MacroSignal API:  http://127.0.0.1:${toString apiPort}  (API_ORIGIN)"
-    echo "MacroSignal Web:  http://127.0.0.1:${toString webPort}  (devenv up)"
+    echo "MacroSignal public: http://127.0.0.1:${toString webPort}"
+    echo "MacroSignal API:    http://127.0.0.1:${toString apiPort}  (main layout only)"
     echo ""
     echo "  devenv up                  # api + web dev processes"
-    echo "  devenv up api              # API only"
-    echo "  devenv up web              # SvelteKit only (needs API running)"
-    echo "  ENV=prod devenv up api     # production-style API (no reload)"
-    echo "  devenv test                # full QA (kill devenv up first; port ${toString apiPort})"
+    echo "  devenv up api              # API only (main layout)"
+    echo "  devenv up web              # public entry (SvelteKit or checkpoint uvicorn)"
+    echo "  ./scripts/prod.sh api prod # production API (systemd)"
+    echo "  ./scripts/prod.sh web prod # production web (systemd)"
+    echo "  devenv test                # full QA (main layout; port ${toString apiPort})"
     echo "  devenv tasks run qa:web    # web oxfmt + oxlint + svelte-check"
     echo "  devenv tasks run build:web # production web build"
     echo "  git push runs devenv test (pre-push hook)"
