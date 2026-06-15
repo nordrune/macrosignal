@@ -8,11 +8,10 @@ let
   qaTypecheck = "${uvRun} ty check";
   qaPytest = "${uvRun} pytest";
   isTesting = config.devenv.isTesting;
-  uvicornApp = ''
-    ${uvRun} uvicorn trading_backtester.api:app \
+  litestarApp = ''
+    ${uvRun} litestar --app trading_backtester.api:app run \
       --host "$HOST" \
-      --port "$PORT" \
-      --log-level info
+      --port "$PORT"
   '';
 in
 {
@@ -47,9 +46,9 @@ in
   processes.app = {
     exec = ''
       if [ "$ENV" = prod ]; then
-        ${uvicornApp} --workers 1
+        ${litestarApp}
       else
-        ${uvicornApp} \
+        ${litestarApp} \
           ${lib.optionalString (!isTesting) "--reload"}
       fi
     '';
@@ -57,7 +56,7 @@ in
       http.get = {
         host = "127.0.0.1";
         port = appPort;
-        path = "/";
+        path = "/health";
       };
       initial_delay = 2;
     };
@@ -97,7 +96,6 @@ in
     };
     "qa:smoke" = {
       exec = ''
-        curl -sf http://127.0.0.1:${toString appPort}/ | grep -qi "MacroSignal"
         curl -sf -X POST http://127.0.0.1:${toString appPort}/api/backtest \
           -H "Content-Type: application/json" \
           -d @tests/fixtures/smoke_backtest_request.json \

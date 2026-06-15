@@ -54,18 +54,24 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.server:
-        import uvicorn
+        import subprocess
 
-        print(
-            f"Starting MacroSignal dashboard on http://{args.host}:{args.port}"
+        print(f"Starting MacroSignal API on http://{args.host}:{args.port}")
+        # ponytail: litestar CLI matches devenv; uvicorn stays transitive
+        return subprocess.call(
+            [
+                sys.executable,
+                "-m",
+                "litestar",
+                "--app",
+                "trading_backtester.api:app",
+                "run",
+                "--host",
+                args.host,
+                "--port",
+                str(args.port),
+            ]
         )
-        uvicorn.run(
-            "trading_backtester.api:app",
-            host=args.host,
-            port=args.port,
-            log_level="info",
-        )
-        return 0
 
     if not args.csv_file:
         parser.print_usage(sys.stderr)
