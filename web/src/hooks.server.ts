@@ -2,7 +2,7 @@ import type { Handle } from '@sveltejs/kit';
 
 const apiOrigin = process.env.API_ORIGIN ?? 'http://127.0.0.1:41793';
 
-// ponytail: prod API proxy — Bun adapter has no Vite proxy
+// ponytail: prod API proxy; Bun adapter has no Vite proxy
 export const handle: Handle = async ({ event, resolve }) => {
 	const path = event.url.pathname;
 	if (path.startsWith('/api') || path === '/health') {
@@ -16,11 +16,18 @@ export const handle: Handle = async ({ event, resolve }) => {
 		if (event.request.method !== 'GET' && event.request.method !== 'HEAD') {
 			init.body = await event.request.arrayBuffer();
 		}
-		const response = await fetch(target, init);
-		return new Response(response.body, {
-			status: response.status,
-			headers: response.headers
-		});
+		try {
+			const response = await fetch(target, init);
+			return new Response(response.body, {
+				status: response.status,
+				headers: response.headers
+			});
+		} catch {
+			return new Response(JSON.stringify({ detail: 'API unreachable' }), {
+				status: 502,
+				headers: { 'content-type': 'application/json' }
+			});
+		}
 	}
 	return resolve(event);
 };
