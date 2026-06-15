@@ -133,6 +133,7 @@
 		@apply overflow-x-clip overflow-y-auto;
 		color-scheme: dark;
 		scrollbar-gutter: stable;
+		touch-action: manipulation;
 	}
 
 	select,
