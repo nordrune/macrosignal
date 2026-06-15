@@ -1,9 +1,14 @@
 # OS
 .DS_Store
+Thumbs.db
 
 # Logs
 logs
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
 # Database
 *.sqlite
@@ -12,31 +17,55 @@ logs
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.mypy_cache/
 .ruff_cache/
 .venv/
 venv/
 .cache/
 dist/
-build/
 *.egg-info/
+*.egg
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# JavaScript / Bun (web and tooling)
+node_modules/
+.svelte-kit/
+build/
+.output/
+.vercel/
+.netlify/
+.wrangler/
+.vite/
+*.tsbuildinfo
 
 # Environment
 .env
 .env.*
 !.env.example
+!.env.test
 
 # Crash dumps
 core
 core.*
 
-# Devenv
+# Devenv / direnv
 .devenv*
 devenv.local.nix
 devenv.local.yaml
 .pre-commit-config.yaml
-
-# direnv
 .direnv
 
-# local deploy script
+# Editor / IDE
+.idea/
+*.swp
+*.swo
+*~
+
+# Local deploy script
 deploy.sh
+
+# Legacy frontend artifacts (removed — keep ignored if recreated locally)
+frontend/

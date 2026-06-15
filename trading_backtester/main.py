@@ -24,7 +24,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--server",
         action="store_true",
-        help="Start the web server dashboard.",
+        help="Start the Litestar API server.",
     )
     parser.add_argument(
         "--host",

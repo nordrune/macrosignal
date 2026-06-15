@@ -18,6 +18,7 @@ SvelteKit 2 dashboard (Svelte 5 runes, TypeScript strict). Bun toolchain. Served
 
 ## Local contracts
 
+- Responsive layout: Tailwind `sm:` / `md:` / `lg:` breakpoints; tables scroll via shadcn `overflow-x-auto`
 - Strict TypeScript (`tsconfig.json` strict: true)
 - Svelte 5 runes: `$state`, `$derived`, `$props`; avoid `$effect` except canvas/DOM sync
 - i18n via `getI18n()` from layout context — no global writable store
@@ -36,7 +37,8 @@ SvelteKit 2 dashboard (Svelte 5 runes, TypeScript strict). Bun toolchain. Served
 ```bash
 cd web && bun run qa          # oxfmt --check, oxlint, svelte-check
 cd web && bun run qa:fix      # auto-fix format + lint
-devenv tasks run qa:web:lint
+devenv tasks run qa:web       # same via devenv (runs after install)
+devenv tasks run build:web    # production build → web/build/
 ```
 
 ## Child DOX Index

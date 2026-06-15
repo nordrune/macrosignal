@@ -236,34 +236,42 @@
 </script>
 
 <Tooltip.TooltipProvider>
-	<div class="bg-background min-h-screen">
+	<div class="bg-background min-h-screen min-w-0">
 		<header class="border-border bg-card/40 border-b">
 			<div
-				class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-5 lg:px-6"
+				class="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:py-5 lg:px-6"
 			>
-				<div>
+				<div class="min-w-0">
 					<p class="text-primary text-xs font-medium tracking-widest uppercase">
 						{i18n.t('header.eyebrow')}
 					</p>
-					<h1 class="text-2xl font-bold tracking-tight">
+					<h1 class="text-xl font-bold tracking-tight sm:text-2xl">
 						MacroSignal <span class="text-muted-foreground">{i18n.t('header.productSuffix')}</span>
 					</h1>
 				</div>
 
-				<div class="flex flex-wrap items-center gap-2">
+				<div class="flex w-full flex-wrap items-center gap-2 sm:w-auto">
 					<div class="border-border flex rounded-lg border p-0.5">
 						<Button
 							variant={i18n.lang === 'de' ? 'default' : 'ghost'}
 							size="sm"
+							class="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0"
 							onclick={() => i18n.setLanguage('de')}>DE</Button
 						>
 						<Button
 							variant={i18n.lang === 'en' ? 'default' : 'ghost'}
 							size="sm"
+							class="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0"
 							onclick={() => i18n.setLanguage('en')}>EN</Button
 						>
 					</div>
-					<Button variant="outline" size="sm" disabled={!result} onclick={handleExport}>
+					<Button
+						variant="outline"
+						size="sm"
+						class="min-h-11 flex-1 sm:min-h-0 sm:flex-none"
+						disabled={!result}
+						onclick={handleExport}
+					>
 						<DownloadIcon class="size-4" />
 						{i18n.t('export.csv')}
 					</Button>
@@ -281,16 +289,20 @@
 			</div>
 		</header>
 
-		<main class="mx-auto max-w-7xl space-y-6 px-4 py-6 lg:px-6">
+		<main class="mx-auto max-w-7xl min-w-0 space-y-6 px-4 py-6 lg:px-6">
 			<Card.Card>
 				<Card.CardHeader>
 					<Card.CardTitle>{i18n.t('section.settings')}</Card.CardTitle>
 				</Card.CardHeader>
 				<Card.CardContent class="space-y-6">
 					<Tabs.Tabs bind:value={dataSource} onValueChange={() => scheduleAutoRun()}>
-						<Tabs.TabsList>
-							<Tabs.TabsTrigger value="api">{i18n.t('source.yahoo')}</Tabs.TabsTrigger>
-							<Tabs.TabsTrigger value="csv">{i18n.t('source.csv')}</Tabs.TabsTrigger>
+						<Tabs.TabsList class="h-auto w-full sm:h-8 sm:w-fit">
+							<Tabs.TabsTrigger value="api" class="min-h-11 flex-1 sm:min-h-0 sm:flex-none"
+								>{i18n.t('source.yahoo')}</Tabs.TabsTrigger
+							>
+							<Tabs.TabsTrigger value="csv" class="min-h-11 flex-1 sm:min-h-0 sm:flex-none"
+								>{i18n.t('source.csv')}</Tabs.TabsTrigger
+							>
 						</Tabs.TabsList>
 
 						<Tabs.TabsContent value="api" class="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -331,12 +343,18 @@
 								</Tooltip.Root>
 							</Label>
 							<div class="flex flex-wrap gap-2">
-								<Button variant="outline" size="sm" onclick={() => (csvText = SAMPLE_CSV)}>
+								<Button
+									variant="outline"
+									size="sm"
+									class="min-h-11 flex-1 sm:min-h-0 sm:flex-none"
+									onclick={() => (csvText = SAMPLE_CSV)}
+								>
 									Sample
 								</Button>
 								<Button
 									variant="outline"
 									size="sm"
+									class="min-h-11 flex-1 sm:min-h-0 sm:flex-none"
 									onclick={() => document.getElementById('csv-file-input')?.click()}
 								>
 									{i18n.t('csv.upload')}
@@ -429,12 +447,16 @@
 							/>
 						</div>
 
-						<div class="flex flex-col justify-end gap-3">
-							<label class="flex items-center gap-2 text-sm">
+						<div class="flex flex-col justify-end gap-3 md:col-span-2 lg:col-span-1">
+							<label class="flex min-h-11 items-center gap-2 text-sm sm:min-h-0">
 								<Checkbox bind:checked={autoRun} />
 								{i18n.t('autorun.label')}
 							</label>
-							<Button disabled={isRunning} onclick={() => runBacktest()}>
+							<Button
+								class="min-h-11 w-full sm:min-h-0"
+								disabled={isRunning}
+								onclick={() => runBacktest()}
+							>
 								<PlayIcon class="size-4" />
 								{i18n.t('action.run')}
 							</Button>
@@ -444,7 +466,7 @@
 			</Card.Card>
 
 			<Card.Card>
-				<Card.CardHeader class="flex-row items-center justify-between">
+				<Card.CardHeader class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 					<Card.CardTitle class="flex items-center gap-2">
 						<SparklesIcon class="text-primary size-4" />
 						{i18n.t('optimizer.title')}
@@ -452,6 +474,7 @@
 					<Button
 						variant="outline"
 						size="sm"
+						class="min-h-11 w-full sm:min-h-0 sm:w-auto"
 						disabled={isOptimizing || isRunning}
 						onclick={runOptimize}
 					>
@@ -478,7 +501,8 @@
 								{#each optimizeRuns as run, i (i)}
 									<Table.TableRow>
 										<Table.TableCell>{i + 1}</Table.TableCell>
-										<Table.TableCell class="font-mono text-xs"
+										<Table.TableCell
+											class="max-w-48 font-mono text-xs whitespace-nowrap sm:max-w-none"
 											>{formatOptimizeParams(run.params)}</Table.TableCell
 										>
 										<Table.TableCell
@@ -633,14 +657,16 @@
 				</div>
 
 				<Card.Card>
-					<Card.CardHeader class="flex-row flex-wrap items-end justify-between gap-4">
-						<div>
+					<Card.CardHeader
+						class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between"
+					>
+						<div class="min-w-0">
 							<Card.CardTitle>{i18n.t('results.title')}</Card.CardTitle>
 							<Card.CardDescription>
 								{i18n.t('summary.loaded', { count: result.series_data.length })}
 							</Card.CardDescription>
 						</div>
-						<div class="flex flex-wrap gap-4 text-sm">
+						<div class="grid w-full gap-2 text-sm sm:flex sm:w-auto sm:flex-wrap sm:gap-4">
 							<div>
 								<span class="text-muted-foreground">{i18n.t('inspect.date')}: </span>
 								<span>{selectedPoint?.date ?? i18n.t('inspect.defaultDate')}</span>
@@ -670,8 +696,8 @@
 							</div>
 						</div>
 					</Card.CardHeader>
-					<Card.CardContent class="space-y-3">
-						<div class="text-muted-foreground flex flex-wrap gap-3 text-xs">
+					<Card.CardContent class="min-w-0 space-y-3">
+						<div class="text-muted-foreground flex flex-wrap gap-x-3 gap-y-2 text-xs">
 							<span class="flex items-center gap-1.5"
 								><span class="bg-foreground inline-block h-0.5 w-4"></span>{i18n.t(
 									'legend.price'
@@ -737,7 +763,11 @@
 								{:else}
 									{#each result.trades as trade, idx (trade.date + trade.type + idx)}
 										<Table.TableRow
-											class={cn('cursor-pointer', selectedTradeIndex === idx && 'bg-muted/60')}
+											class={cn(
+												'cursor-pointer',
+												'min-h-11 sm:min-h-0',
+												selectedTradeIndex === idx && 'bg-muted/60'
+											)}
 											onclick={() => selectTrade(idx)}
 										>
 											<Table.TableCell class="font-mono">{trade.date}</Table.TableCell>
@@ -786,7 +816,9 @@
 			{/if}
 		</main>
 
-		<footer class="border-border text-muted-foreground border-t py-6 text-center text-sm">
+		<footer
+			class="border-border text-muted-foreground border-t px-4 py-6 text-center text-sm sm:px-6"
+		>
 			{i18n.t('footer')}
 		</footer>
 	</div>

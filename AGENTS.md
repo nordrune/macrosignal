@@ -15,8 +15,11 @@ Educational tool; no broker integration.
 - DTOs live in `trading_backtester/dto.py` (msgspec); domain logic stays framework-free
 - Frontend: SvelteKit 2 in `web/`; Bun package manager; `svelte-adapter-bun` for prod
 - Dev: `devenv up` runs API (`:41793`) + SvelteKit (`:5173`); browser uses `:5173`
+- Env: `API_ORIGIN`, `API_PORT`, `WEB_PORT`, `HOST` set in `devenv.nix` (used by Vite proxy + `hooks.server.ts`)
 - Do not run `devenv up` and `devenv test` concurrently (API port conflict)
-- Web QA: Oxc (`oxlint` + `oxfmt`) + `svelte-check`; Python QA: `ruff` + `ty`
+- Web QA: `devenv tasks run qa:web` or `cd web && bun run qa` (Oxc + `svelte-check`)
+- Python QA: `ruff` + `ty`; full gate: `devenv test` (pre-push hook)
+- Prod web build: `devenv tasks run build:web` → `web/build/` (gitignored)
 
 ## User preferences
 
@@ -29,5 +32,5 @@ Educational tool; no broker integration.
 | Path | Scope |
 |------|--------|
 | [trading_backtester/AGENTS.md](trading_backtester/AGENTS.md) | Python API, backtester, CLI |
-| [web/AGENTS.md](web/AGENTS.md) | SvelteKit dashboard (after scaffold) |
+| [web/AGENTS.md](web/AGENTS.md) | SvelteKit dashboard |
 | [tests/AGENTS.md](tests/AGENTS.md) | pytest + smoke contract tests |
