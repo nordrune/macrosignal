@@ -21,6 +21,14 @@
         <span id="activeTicker">Ticker: BTC-USD</span>
         <span id="activeFee">Gebühr: 0.1%</span>
       </div>
+      <div class="export-controls">
+        <button id="exportMenuBtn" class="export-btn" type="button" aria-haspopup="true" aria-expanded="false" disabled data-i18n="export.button">Export</button>
+        <div id="exportMenu" class="export-menu" hidden>
+          <button id="exportCsvBtn" type="button" data-export-format="csv" data-i18n="export.csv">CSV</button>
+          <button id="exportExcelBtn" type="button" data-export-format="excel" data-i18n="export.excel">Excel</button>
+          <button id="exportPdfBtn" type="button" data-export-format="pdf" data-i18n="export.pdf">PDF</button>
+        </div>
+      </div>
       <div class="language-switch" data-i18n-aria-label="language.aria" aria-label="Sprache wechseln">
         <button class="lang-btn active" type="button" data-language-option="de" aria-pressed="true">DE</button>
         <button class="lang-btn" type="button" data-language-option="en" aria-pressed="false">EN</button>
@@ -38,8 +46,8 @@
           <span class="help-tip" tabindex="0" data-i18n-tooltip="source.tooltip" data-tooltip="Hier wählst du, ob echte historische Marktdaten geladen werden oder ob eine eigene CSV-Datei verwendet wird." aria-label="Info">?</span>
         </span>
         <div class="toggle-buttons">
-          <button id="sourceApiBtn" class="source-btn active" type="button" data-i18n="source.yahoo">Yahoo Finance</button>
-          <button id="sourceCsvBtn" class="source-btn" type="button" data-i18n="source.csv">CSV-Datei</button>
+          <button id="sourceApiBtn" class="source-btn active" type="button" data-source-option="api" aria-pressed="true" data-i18n="source.yahoo">Yahoo Finance</button>
+          <button id="sourceCsvBtn" class="source-btn" type="button" data-source-option="csv" aria-pressed="false" data-i18n="source.csv">CSV-Datei</button>
         </div>
       </div>
 
@@ -143,7 +151,7 @@
 
       </div>
 
-      <div class="settings-row-2">
+      <div class="settings-row-2 money-settings-row">
         <div class="input-group">
           <label for="startingCapital">
             <span data-i18n="capital.start">Startkapital</span>
@@ -152,9 +160,12 @@
           <input id="startingCapital" type="number" min="1" step="100" value="10000">
         </div>
         <div class="input-group">
-          <label for="feeRate">
-            <span data-i18n="fee.label">Gebühr pro Kauf/Verkauf (%)</span>
-            <span class="help-tip" tabindex="0" data-i18n-tooltip="fee.tooltip" data-tooltip="Simulierte Handelsgebühr bei jedem Kauf oder Verkauf. 0.1 bedeutet 0.1 Prozent." aria-label="Info">?</span>
+          <label for="feeRate" class="fee-label">
+            <span data-i18n="fee.labelLine1">Gebühr pro Kauf</span>
+            <span class="fee-label-line">
+              <span data-i18n="fee.labelLine2">Verkauf (%)</span>
+              <span class="help-tip" tabindex="0" data-i18n-tooltip="fee.tooltip" data-tooltip="Simulierte Handelsgebühr bei jedem Kauf oder Verkauf. 0.1 bedeutet 0.1 Prozent." aria-label="Info">?</span>
+            </span>
           </label>
           <input id="feeRate" type="number" min="0" step="0.01" value="0.1">
         </div>
@@ -280,6 +291,33 @@
       </div>
     </section>
 
+    <section class="analysis-panel" aria-labelledby="analysis-title">
+      <div class="panel-header-inline">
+        <h2 id="analysis-title" class="section-title" data-i18n="analysis.title">Analyse der Simulation</h2>
+        <span id="analysisSummary" class="subtitle" data-i18n="analysis.empty">Noch keine Analyse verfügbar.</span>
+      </div>
+
+      <div class="analysis-section">
+        <h3 data-i18n="analysis.tradeTitle">Trade-Analyse</h3>
+        <div id="tradeAnalysisGrid" class="analysis-grid"></div>
+      </div>
+
+      <div class="analysis-section">
+        <h3 data-i18n="analysis.feeTitle">Kosten-Analyse</h3>
+        <div id="feeAnalysisGrid" class="analysis-grid"></div>
+      </div>
+
+      <div class="analysis-section">
+        <h3 data-i18n="analysis.drawdownTitle">Drawdown-Analyse</h3>
+        <div id="drawdownAnalysisGrid" class="analysis-grid"></div>
+      </div>
+
+      <div class="analysis-section">
+        <h3 data-i18n="analysis.activityTitle">Aktivitäts-Analyse</h3>
+        <div id="activityAnalysisGrid" class="analysis-grid"></div>
+      </div>
+    </section>
+
     <section class="table-panel" aria-labelledby="trades-title">
       <div class="panel-header-inline">
         <h2 id="trades-title" class="section-title" data-i18n="trades.title">Simulierte Käufe und Verkäufe</h2>
@@ -309,7 +347,7 @@
       <div id="tradeInspectorPanel" class="trade-inspector-panel" hidden>
         <div class="inspector-header">
           <h3 class="inspector-title" data-i18n="trade.details">Details zur Aktion</h3>
-          <button id="closeInspectorBtn" class="close-btn" data-i18n-aria-label="trade.closeAria" aria-label="Details schließen">&times;</button>
+          <button id="closeInspectorBtn" class="close-btn" type="button" data-i18n-aria-label="trade.closeAria" aria-label="Details schließen">&times;</button>
         </div>
         <div class="inspector-grid">
           <div class="inspector-card">

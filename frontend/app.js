@@ -39,6 +39,11 @@ const el = {
   activeStrategy: document.getElementById("activeStrategy"),
   activeTicker: document.getElementById("activeTicker"),
   activeFee: document.getElementById("activeFee"),
+  exportMenuBtn: document.getElementById("exportMenuBtn"),
+  exportMenu: document.getElementById("exportMenu"),
+  exportCsvBtn: document.getElementById("exportCsvBtn"),
+  exportExcelBtn: document.getElementById("exportExcelBtn"),
+  exportPdfBtn: document.getElementById("exportPdfBtn"),
 
   dataSummary: document.getElementById("dataSummary"),
   startCapital: document.getElementById("startCapital"),
@@ -63,6 +68,12 @@ const el = {
   selectedClose: document.getElementById("selectedClose"),
   selectedAverage: document.getElementById("selectedAverage"),
   selectedSignal: document.getElementById("selectedSignal"),
+
+  analysisSummary: document.getElementById("analysisSummary"),
+  tradeAnalysisGrid: document.getElementById("tradeAnalysisGrid"),
+  feeAnalysisGrid: document.getElementById("feeAnalysisGrid"),
+  drawdownAnalysisGrid: document.getElementById("drawdownAnalysisGrid"),
+  activityAnalysisGrid: document.getElementById("activityAnalysisGrid"),
 
   tradeTableBody: document.getElementById("tradeTableBody"),
 
@@ -91,13 +102,17 @@ const state = {
   activeTicker: "BTC-USD",
   activeUsesCsv: false,
   activeFee: DEFAULT_FEE_PERCENT,
+  lastRunSnapshot: null,
+  lastAnalytics: null,
 
   selectedPointIndex: null,
   selectedTradeIndex: null,
   chartGeom: null,
   subChartGeom: null,
   animationFrame: null,
-  pendingRunTimeout: null
+  pendingRunTimeout: null,
+  activeRequestId: 0,
+  isRunning: false
 };
 
 // --- SOURCE & STRATEGY TOGGLES ---
@@ -112,11 +127,15 @@ function setDataSource(source) {
   if (source === "api") {
     el.sourceApiBtn.classList.add("active");
     el.sourceCsvBtn.classList.remove("active");
+    el.sourceApiBtn.setAttribute("aria-pressed", "true");
+    el.sourceCsvBtn.setAttribute("aria-pressed", "false");
     el.apiSettings.classList.add("active");
     el.csvSettings.classList.remove("active");
   } else {
     el.sourceApiBtn.classList.remove("active");
     el.sourceCsvBtn.classList.add("active");
+    el.sourceApiBtn.setAttribute("aria-pressed", "false");
+    el.sourceCsvBtn.setAttribute("aria-pressed", "true");
     el.apiSettings.classList.remove("active");
     el.csvSettings.classList.add("active");
   }
@@ -152,19 +171,25 @@ function refreshLanguageSensitiveUi() {
   if (state.lastResult) {
     renderResults(state.lastResult);
     renderTradeLog(state.trades);
+    renderAnalysisPanel(state.lastAnalytics);
     renderSelectedPoint(
       state.selectedPointIndex !== null ? state.strategyData[state.selectedPointIndex] : null
     );
     drawCharts(1);
   } else {
+    resetAnalysisPanel();
     renderSelectedPoint(null);
   }
+  updateExportState();
 }
 
 /**
  * Build a backtest request from the form, call the API, and render the result.
  */
 async function runBacktest() {
+  const requestId = state.activeRequestId + 1;
+  state.activeRequestId = requestId;
+  setBusyState(true);
   setStatusKey("status.running", "info");
   
   try {
@@ -206,6 +231,7 @@ async function runBacktest() {
     
     state.activeStrategy = strategy;
     state.activeFee = feeRate;
+    const runSnapshot = buildRunSnapshot(payload, strategyParams);
     renderActiveConfig();
     
     const response = await fetch("/api/backtest", {
@@ -222,6 +248,10 @@ async function runBacktest() {
     }
     
     const result = await response.json();
+
+    if (requestId !== state.activeRequestId) {
+      return;
+    }
     
     // Keep raw API data in state so language changes and chart redraws do not
     // need another server request.
@@ -233,6 +263,13 @@ async function runBacktest() {
     state.maxDrawdown = result.max_drawdown;
     state.buyAndHoldReturn = result.buy_and_hold_return;
     state.lastResult = result;
+    state.lastRunSnapshot = {
+      ...runSnapshot,
+      dateStart: result.series_data[0]?.date || "-",
+      dateEnd: result.series_data[result.series_data.length - 1]?.date || "-",
+      dataPoints: result.series_data.length
+    };
+    state.lastAnalytics = calculateSimulationAnalytics(result);
     
     state.selectedPointIndex = null;
     state.selectedTradeIndex = null;
@@ -240,14 +277,585 @@ async function runBacktest() {
     
     renderResults(result);
     renderTradeLog(result.trades);
+    renderAnalysisPanel(state.lastAnalytics);
     renderSelectedPoint(null);
     animateCharts();
+    updateExportState();
     setStatusKey("status.done", "success");
     
   } catch (error) {
+    if (requestId !== state.activeRequestId) {
+      return;
+    }
     console.error(error);
     setStatusText(error.message, "error");
+  } finally {
+    if (requestId === state.activeRequestId) {
+      setBusyState(false);
+    }
   }
+}
+
+function setBusyState(isRunning) {
+  state.isRunning = isRunning;
+  [el.fetchDataBtn, el.runButton].forEach((button) => {
+    button.disabled = isRunning;
+    button.setAttribute("aria-busy", String(isRunning));
+  });
+}
+
+function buildRunSnapshot(payload, strategyParams) {
+  return {
+    dataSource: state.dataSource === "api" ? t("source.yahoo") : t("source.csv"),
+    asset: state.dataSource === "api" ? payload.symbol : t("active.customCsv"),
+    period: state.dataSource === "api" ? selectedOptionText(el.periodSelect) : "-",
+    interval: state.dataSource === "api" ? selectedOptionText(el.intervalSelect) : "-",
+    strategy: selectedOptionText(el.strategySelect),
+    strategyType: payload.strategy_type,
+    strategyParams,
+    startingCapital: payload.starting_capital,
+    feePercent: payload.transaction_fee_percent
+  };
+}
+
+function selectedOptionText(select) {
+  return select.selectedOptions[0]?.textContent.trim() || select.value;
+}
+
+function updateExportState() {
+  const hasExportData = Boolean(state.lastResult && state.lastRunSnapshot);
+  [el.exportMenuBtn, el.exportCsvBtn, el.exportExcelBtn, el.exportPdfBtn].forEach((button) => {
+    button.disabled = !hasExportData;
+  });
+}
+
+function getExportRows() {
+  if (!state.lastResult || !state.lastRunSnapshot) {
+    throw new Error(t("export.empty"));
+  }
+
+  const snapshot = state.lastRunSnapshot;
+  const result = state.lastResult;
+  const params = Object.entries(snapshot.strategyParams)
+    .map(([key, value]) => `${key}: ${value}`)
+    .join(", ") || "-";
+
+  const parameterRows = [
+    [t("export.generatedAt"), new Date().toLocaleString()],
+    [t("export.asset"), snapshot.asset],
+    [t("export.dataSource"), snapshot.dataSource],
+    [t("export.timeRange"), snapshot.period],
+    [t("export.interval"), snapshot.interval],
+    [t("export.dateRange"), `${snapshot.dateStart} - ${snapshot.dateEnd}`],
+    [t("export.strategy"), snapshot.strategy],
+    [t("export.strategyParams"), params],
+    [t("export.startingCapital"), formatCurrency(snapshot.startingCapital)],
+    [t("export.fee"), `${snapshot.feePercent}%`],
+    [t("export.dataPoints"), snapshot.dataPoints],
+    [t("export.finalCapital"), formatCurrency(result.end_capital)],
+    [t("export.profitLoss"), formatCurrency(result.profit_loss)],
+    [t("export.strategyReturn"), `${result.profit_loss_percent.toFixed(2)}%`]
+  ];
+
+  const tradeRows = state.trades.map((trade) => [
+    trade.date,
+    trade.type === "buy" ? t("trade.buy") : t("trade.sell"),
+    trade.price,
+    trade.units,
+    trade.fee,
+    trade.cashBalance
+  ]);
+
+  return { parameterRows, tradeRows };
+}
+
+function exportCurrentRun(format) {
+  try {
+    if (format === "csv") {
+      exportCsv();
+    } else if (format === "excel") {
+      exportExcel();
+    } else if (format === "pdf") {
+      exportPdf();
+    }
+    closeExportMenu();
+  } catch (error) {
+    setStatusText(error.message, "error");
+  }
+}
+
+function exportCsv() {
+  const { parameterRows, tradeRows } = getExportRows();
+  const rows = [
+    [t("export.parametersTitle")],
+    ...parameterRows,
+    [],
+    [t("export.tradesTitle")],
+    getTradeHeaderRow(),
+    ...tradeRows
+  ];
+  downloadBlob(toCsv(rows), "macrosignal-export.csv", "text/csv;charset=utf-8");
+}
+
+function exportExcel() {
+  const { parameterRows, tradeRows } = getExportRows();
+  const workbook = `<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+  xmlns:o="urn:schemas-microsoft-com:office:office"
+  xmlns:x="urn:schemas-microsoft-com:office:excel"
+  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+  ${excelWorksheet(t("export.parametersTitle"), parameterRows)}
+  ${excelWorksheet(t("export.tradesTitle"), [getTradeHeaderRow(), ...tradeRows])}
+</Workbook>`;
+  downloadBlob(workbook, "macrosignal-export.xls", "application/vnd.ms-excel;charset=utf-8");
+}
+
+function exportPdf() {
+  const { parameterRows, tradeRows } = getExportRows();
+  const reportWindow = window.open("", "_blank");
+  if (!reportWindow) {
+    throw new Error(t("error.backtest"));
+  }
+
+  reportWindow.document.write(buildPrintReport(parameterRows, tradeRows));
+  reportWindow.document.close();
+  reportWindow.focus();
+  reportWindow.print();
+}
+
+function getTradeHeaderRow() {
+  return [
+    t("table.date"),
+    t("table.action"),
+    t("table.price"),
+    t("table.units"),
+    t("table.fee"),
+    t("table.cash")
+  ];
+}
+
+function toCsv(rows) {
+  return rows.map((row) => row.map(csvCell).join(",")).join("\n");
+}
+
+function csvCell(value) {
+  const text = String(value ?? "");
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
+function excelWorksheet(name, rows) {
+  return `<Worksheet ss:Name="${escapeXml(name)}"><Table>${rows.map(excelRow).join("")}</Table></Worksheet>`;
+}
+
+function excelRow(row) {
+  return `<Row>${row.map((cell) => `<Cell><Data ss:Type="${typeof cell === "number" ? "Number" : "String"}">${escapeXml(cell)}</Data></Cell>`).join("")}</Row>`;
+}
+
+function buildPrintReport(parameterRows, tradeRows) {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>${escapeHtml(t("export.reportTitle"))}</title>
+  <style>
+    body { font-family: Arial, sans-serif; color: #111827; margin: 28px; }
+    h1 { margin: 0 0 20px; }
+    h2 { margin: 0 0 14px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { border: 1px solid #d1d5db; padding: 8px; text-align: left; }
+    th { background: #f3f4f6; }
+    .page { page-break-after: always; }
+    .page:last-child { page-break-after: auto; }
+  </style>
+</head>
+<body>
+  <section class="page">
+    <h1>${escapeHtml(t("export.reportTitle"))}</h1>
+    <h2>${escapeHtml(t("export.parametersTitle"))}</h2>
+    ${htmlTable(parameterRows)}
+  </section>
+  <section class="page">
+    <h2>${escapeHtml(t("export.tradesTitle"))}</h2>
+    ${htmlTable([getTradeHeaderRow(), ...tradeRows], true)}
+  </section>
+</body>
+</html>`;
+}
+
+function htmlTable(rows, hasHeader = false) {
+  return `<table>${rows.map((row, index) => {
+    const tag = hasHeader && index === 0 ? "th" : "td";
+    return `<tr>${row.map((cell) => `<${tag}>${escapeHtml(cell)}</${tag}>`).join("")}</tr>`;
+  }).join("")}</table>`;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function escapeXml(value) {
+  return escapeHtml(value).replaceAll("'", "&apos;");
+}
+
+function downloadBlob(content, filename, type) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function toggleExportMenu() {
+  if (el.exportMenuBtn.disabled) {
+    setStatusKey("export.empty", "error");
+    return;
+  }
+  const nextHidden = !el.exportMenu.hidden;
+  el.exportMenu.hidden = nextHidden;
+  el.exportMenuBtn.setAttribute("aria-expanded", String(!nextHidden));
+}
+
+function closeExportMenu() {
+  el.exportMenu.hidden = true;
+  el.exportMenuBtn.setAttribute("aria-expanded", "false");
+}
+
+function calculateSimulationAnalytics(result) {
+  const tradeAnalytics = calculateTradeAnalytics(result.trades, result.series_data);
+  const feeAnalytics = calculateFeeAnalytics(result.trades, result);
+  const drawdownAnalytics = calculateDrawdownAnalytics(result.capital_history);
+  const activityAnalytics = calculateActivityAnalytics(result.trades, result.series_data);
+
+  return {
+    trade: tradeAnalytics,
+    fees: feeAnalytics,
+    drawdown: drawdownAnalytics,
+    activity: activityAnalytics,
+    summary: {
+      positions: tradeAnalytics.completedPositions.length,
+      trades: result.trades.length,
+      days: result.series_data.length
+    }
+  };
+}
+
+function calculateTradeAnalytics(trades, seriesData) {
+  const completedPositions = [];
+  const openBuys = [];
+  const finalPoint = seriesData[seriesData.length - 1] || null;
+
+  trades.forEach((trade) => {
+    if (trade.type === "buy") {
+      openBuys.push(trade);
+      return;
+    }
+
+    if (trade.type !== "sell" || openBuys.length === 0) {
+      return;
+    }
+
+    const entry = openBuys.shift();
+    completedPositions.push(buildPositionAnalytics(entry, trade, false));
+  });
+
+  const openPositions = openBuys.map((entry) => {
+    if (!finalPoint) return null;
+    const syntheticExit = {
+      date: finalPoint.date,
+      price: finalPoint.close,
+      fee: 0
+    };
+    return buildPositionAnalytics(entry, syntheticExit, true);
+  }).filter(Boolean);
+
+  const winningPositions = completedPositions.filter((position) => position.profit > 0);
+  const losingPositions = completedPositions.filter((position) => position.profit < 0);
+  const bestPosition = maxBy(completedPositions, (position) => position.profit);
+  const worstPosition = minBy(completedPositions, (position) => position.profit);
+
+  return {
+    completedPositions,
+    openPositions,
+    bestPosition,
+    worstPosition,
+    winningPositions: winningPositions.length,
+    losingPositions: losingPositions.length,
+    averageProfit: average(completedPositions.map((position) => position.profit)),
+    averageRoi: average(completedPositions.map((position) => position.roi)),
+    averageHoldDays: average(completedPositions.map((position) => position.holdDays)),
+    longestWinStreak: longestStreak(completedPositions, (position) => position.profit > 0),
+    longestLossStreak: longestStreak(completedPositions, (position) => position.profit < 0)
+  };
+}
+
+function buildPositionAnalytics(entry, exit, isOpen) {
+  const units = entry.units || 0;
+  const totalFees = (entry.fee || 0) + (exit.fee || 0);
+  const profit = (exit.price - entry.price) * units - totalFees;
+  const cost = entry.price * units;
+  return {
+    entryDate: entry.date,
+    exitDate: exit.date,
+    entryPrice: entry.price,
+    exitPrice: exit.price,
+    units,
+    profit,
+    roi: cost > 0 ? (profit / cost) * 100 : 0,
+    holdDays: daysBetween(entry.date, exit.date),
+    fees: totalFees,
+    isOpen
+  };
+}
+
+function calculateFeeAnalytics(trades, result) {
+  const totalFees = trades.reduce((sum, trade) => sum + (Number(trade.fee) || 0), 0);
+  const averageFee = trades.length > 0 ? totalFees / trades.length : 0;
+  const startCapital = result.start_capital || 0;
+  const endCapital = result.end_capital || 0;
+
+  return {
+    totalFees,
+    averageFee,
+    feesStartShare: startCapital > 0 ? (totalFees / startCapital) * 100 : 0,
+    feesEndShare: endCapital > 0 ? (totalFees / endCapital) * 100 : 0
+  };
+}
+
+function calculateDrawdownAnalytics(capitalHistory) {
+  let peakCapital = 0;
+  let peakDate = "-";
+  let deepestDrawdown = 0;
+  let deepestDate = "-";
+  let peakBeforeDeepest = 0;
+  let longestDrawdownDays = 0;
+  let currentDrawdownStart = null;
+  let recovered = true;
+
+  capitalHistory.forEach((point) => {
+    const capital = Number(point.capital) || 0;
+
+    if (capital >= peakCapital) {
+      if (currentDrawdownStart) {
+        longestDrawdownDays = Math.max(longestDrawdownDays, daysBetween(currentDrawdownStart, point.date));
+      }
+      peakCapital = capital;
+      peakDate = point.date;
+      currentDrawdownStart = null;
+      recovered = true;
+    } else if (peakCapital > 0) {
+      if (!currentDrawdownStart) {
+        currentDrawdownStart = peakDate;
+      }
+      const drawdown = ((capital - peakCapital) / peakCapital) * 100;
+      if (drawdown < deepestDrawdown) {
+        deepestDrawdown = drawdown;
+        deepestDate = point.date;
+        peakBeforeDeepest = peakCapital;
+      }
+      recovered = false;
+    }
+  });
+
+  if (currentDrawdownStart && capitalHistory.length > 0) {
+    const lastDate = capitalHistory[capitalHistory.length - 1].date;
+    longestDrawdownDays = Math.max(longestDrawdownDays, daysBetween(currentDrawdownStart, lastDate));
+  }
+
+  return {
+    deepestDrawdown,
+    deepestDate,
+    longestDrawdownDays,
+    recovered,
+    peakBeforeDeepest
+  };
+}
+
+function calculateActivityAnalytics(trades, seriesData) {
+  const firstTrade = trades[0] || null;
+  const lastTrade = trades[trades.length - 1] || null;
+  const gaps = [];
+  const monthCounts = new Map();
+
+  for (let idx = 1; idx < trades.length; idx += 1) {
+    gaps.push(daysBetween(trades[idx - 1].date, trades[idx].date));
+  }
+
+  trades.forEach((trade) => {
+    const month = String(trade.date).slice(0, 7);
+    monthCounts.set(month, (monthCounts.get(month) || 0) + 1);
+  });
+
+  let activeMonth = null;
+  monthCounts.forEach((count, month) => {
+    if (!activeMonth || count > activeMonth.count) {
+      activeMonth = { month, count };
+    }
+  });
+
+  return {
+    firstTrade,
+    lastTrade,
+    averageTradeGap: average(gaps),
+    activeMonth,
+    testedDays: seriesData.length
+  };
+}
+
+function renderAnalysisPanel(analytics) {
+  if (!analytics) {
+    resetAnalysisPanel();
+    return;
+  }
+
+  el.analysisSummary.textContent = t("analysis.summary", analytics.summary);
+  renderAnalysisCards(el.tradeAnalysisGrid, buildTradeAnalysisCards(analytics.trade));
+  renderAnalysisCards(el.feeAnalysisGrid, buildFeeAnalysisCards(analytics.fees));
+  renderAnalysisCards(el.drawdownAnalysisGrid, buildDrawdownAnalysisCards(analytics.drawdown));
+  renderAnalysisCards(el.activityAnalysisGrid, buildActivityAnalysisCards(analytics.activity));
+}
+
+function resetAnalysisPanel() {
+  el.analysisSummary.textContent = t("analysis.empty");
+  [el.tradeAnalysisGrid, el.feeAnalysisGrid, el.drawdownAnalysisGrid, el.activityAnalysisGrid].forEach((container) => {
+    container.innerHTML = "";
+  });
+}
+
+function buildTradeAnalysisCards(analytics) {
+  return [
+    analysisCard(t("analysis.bestTrade"), formatPositionProfit(analytics.bestPosition), formatPositionRange(analytics.bestPosition), "positive"),
+    analysisCard(t("analysis.worstTrade"), formatPositionProfit(analytics.worstPosition), formatPositionRange(analytics.worstPosition), "negative"),
+    analysisCard(t("analysis.winningTrades"), analytics.winningPositions.toString(), t("analysis.positionUnit"), "positive"),
+    analysisCard(t("analysis.losingTrades"), analytics.losingPositions.toString(), t("analysis.positionUnit"), analytics.losingPositions > 0 ? "negative" : ""),
+    analysisCard(t("analysis.avgProfit"), formatCurrency(analytics.averageProfit), "", valueTone(analytics.averageProfit)),
+    analysisCard(t("analysis.avgRoi"), formatPercent(analytics.averageRoi), "", valueTone(analytics.averageRoi)),
+    analysisCard(t("analysis.avgHold"), formatDays(analytics.averageHoldDays), "", ""),
+    analysisCard(t("analysis.longestWinStreak"), analytics.longestWinStreak.toString(), t("analysis.positionUnit"), "positive"),
+    analysisCard(t("analysis.longestLossStreak"), analytics.longestLossStreak.toString(), t("analysis.positionUnit"), analytics.longestLossStreak > 0 ? "negative" : "")
+  ];
+}
+
+function buildFeeAnalysisCards(analytics) {
+  return [
+    analysisCard(t("analysis.totalFees"), formatCurrency(analytics.totalFees), "", analytics.totalFees > 0 ? "warning" : ""),
+    analysisCard(t("analysis.avgFee"), formatCurrency(analytics.averageFee), "", ""),
+    analysisCard(t("analysis.feesStartShare"), formatPercent(analytics.feesStartShare), "", analytics.feesStartShare > 1 ? "warning" : ""),
+    analysisCard(t("analysis.feesEndShare"), formatPercent(analytics.feesEndShare), "", analytics.feesEndShare > 1 ? "warning" : "")
+  ];
+}
+
+function buildDrawdownAnalysisCards(analytics) {
+  return [
+    analysisCard(t("analysis.deepestDrawdown"), formatPercent(analytics.deepestDrawdown), "", analytics.deepestDrawdown < 0 ? "negative" : ""),
+    analysisCard(t("analysis.drawdownDate"), analytics.deepestDate || "-", "", ""),
+    analysisCard(t("analysis.longestDrawdown"), formatDays(analytics.longestDrawdownDays), "", analytics.longestDrawdownDays > 0 ? "warning" : ""),
+    analysisCard(t("analysis.recoveryStatus"), analytics.recovered ? t("analysis.recovered") : t("analysis.notRecovered"), "", analytics.recovered ? "positive" : "warning"),
+    analysisCard(t("analysis.peakBeforeDrawdown"), analytics.peakBeforeDeepest > 0 ? formatCurrency(analytics.peakBeforeDeepest) : "-", "", "")
+  ];
+}
+
+function buildActivityAnalysisCards(analytics) {
+  const activeMonthValue = analytics.activeMonth
+    ? `${analytics.activeMonth.month} (${analytics.activeMonth.count})`
+    : "-";
+  return [
+    analysisCard(t("analysis.firstTrade"), formatTradeAction(analytics.firstTrade), analytics.firstTrade?.date || "", ""),
+    analysisCard(t("analysis.lastTrade"), formatTradeAction(analytics.lastTrade), analytics.lastTrade?.date || "", ""),
+    analysisCard(t("analysis.avgTradeGap"), formatDays(analytics.averageTradeGap), "", ""),
+    analysisCard(t("analysis.activeMonth"), activeMonthValue, t("analysis.tradeUnit"), "")
+  ];
+}
+
+function analysisCard(label, value, detail = "", tone = "") {
+  return { label, value, detail, tone };
+}
+
+function renderAnalysisCards(container, cards) {
+  container.innerHTML = cards.map((card) => `
+    <article class="analysis-card ${card.tone ? `analysis-card-${card.tone}` : ""}">
+      <span class="analysis-label">${escapeHtml(card.label)}</span>
+      <strong>${escapeHtml(card.value)}</strong>
+      <small>${escapeHtml(card.detail)}</small>
+    </article>
+  `).join("");
+}
+
+function formatPositionProfit(position) {
+  if (!position) return t("analysis.noCompletedTrades");
+  return formatCurrency(position.profit);
+}
+
+function formatPositionRange(position) {
+  if (!position) return "";
+  return `${position.entryDate} → ${position.exitDate}`;
+}
+
+function formatTradeAction(trade) {
+  if (!trade) return t("analysis.noTrades");
+  return trade.type === "buy" ? t("trade.buy") : t("trade.sell");
+}
+
+function formatPercent(value) {
+  const number = Number(value) || 0;
+  const prefix = number > 0 ? "+" : "";
+  return `${prefix}${number.toFixed(2)}%`;
+}
+
+function formatDays(value) {
+  const number = Number.isFinite(Number(value)) ? Number(value) : 0;
+  return `${number.toFixed(number % 1 === 0 ? 0 : 1)} ${t("analysis.dayShort")}`;
+}
+
+function valueTone(value) {
+  if (value > 0) return "positive";
+  if (value < 0) return "negative";
+  return "";
+}
+
+function daysBetween(startDate, endDate) {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 0;
+  return Math.max(0, Math.round((end - start) / (1000 * 60 * 60 * 24)));
+}
+
+function average(values) {
+  const validValues = values.filter((value) => Number.isFinite(Number(value)));
+  if (validValues.length === 0) return 0;
+  return validValues.reduce((sum, value) => sum + Number(value), 0) / validValues.length;
+}
+
+function maxBy(items, selector) {
+  if (items.length === 0) return null;
+  return items.reduce((best, item) => selector(item) > selector(best) ? item : best, items[0]);
+}
+
+function minBy(items, selector) {
+  if (items.length === 0) return null;
+  return items.reduce((worst, item) => selector(item) < selector(worst) ? item : worst, items[0]);
+}
+
+function longestStreak(items, predicate) {
+  let current = 0;
+  let best = 0;
+  items.forEach((item) => {
+    if (predicate(item)) {
+      current += 1;
+      best = Math.max(best, current);
+    } else {
+      current = 0;
+    }
+  });
+  return best;
 }
 
 function applyStatusMessage(msg, type = "info") {
@@ -771,8 +1379,14 @@ function selectPoint(pointIdx, tradeIdx = null) {
  * Bind all user interactions once the DOM references are available.
  */
 function setupEventListeners() {
-  el.sourceApiBtn.addEventListener("click", () => setDataSource("api"));
-  el.sourceCsvBtn.addEventListener("click", () => setDataSource("csv"));
+  el.exportMenuBtn.addEventListener("click", toggleExportMenu);
+  el.exportCsvBtn.addEventListener("click", () => exportCurrentRun("csv"));
+  el.exportExcelBtn.addEventListener("click", () => exportCurrentRun("excel"));
+  el.exportPdfBtn.addEventListener("click", () => exportCurrentRun("pdf"));
+
+  document.querySelectorAll("[data-source-option]").forEach((button) => {
+    button.addEventListener("click", () => setDataSource(button.dataset.sourceOption));
+  });
 
   el.strategySelect.addEventListener("change", handleStrategyChange);
 
@@ -784,8 +1398,8 @@ function setupEventListeners() {
   
   el.fetchDataBtn.addEventListener("click", runBacktest);
   document.querySelectorAll(".suggestion-token").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      el.tickerInput.value = e.target.dataset.ticker;
+    btn.addEventListener("click", () => {
+      el.tickerInput.value = btn.dataset.ticker;
       runBacktest();
     });
   });
@@ -794,6 +1408,9 @@ function setupEventListeners() {
   el.feeRate.addEventListener("input", scheduleAutoRun);
   el.periodSelect.addEventListener("change", scheduleAutoRun);
   el.intervalSelect.addEventListener("change", scheduleAutoRun);
+  el.autoRun.addEventListener("change", () => {
+    if (el.autoRun.checked) scheduleAutoRun();
+  });
   
   document.querySelectorAll(".strategy-params-panel input").forEach((input) => {
     input.addEventListener("input", scheduleAutoRun);
@@ -811,6 +1428,10 @@ function setupEventListeners() {
   });
   
   el.csvText.addEventListener("input", scheduleAutoRun);
+
+  el.dropZone.addEventListener("click", () => {
+    el.csvFile.click();
+  });
   
   el.dropZone.addEventListener("dragover", (e) => {
     e.preventDefault();
@@ -891,6 +1512,15 @@ function setupEventListeners() {
     if (state.selectedPointIndex !== null) {
       positionTooltip(state.selectedPointIndex);
     }
+  });
+
+  document.addEventListener("click", (event) => {
+    if (event.target.closest(".export-controls")) return;
+    closeExportMenu();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeExportMenu();
   });
 }
 
