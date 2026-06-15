@@ -595,11 +595,9 @@
 					</label>
 
 					<Button class="min-h-11 w-full" onclick={runBacktest}>
-						<span class={STABLE_CLASS.iconSlot}>
-							{#if isInitialLoad}
-								<Loader2Icon class="size-4 animate-spin" />
-							{/if}
-						</span>
+						{#if isInitialLoad}
+							<Loader2Icon class="size-4 animate-spin" />
+						{/if}
 						{i18n.t('action.run')}
 					</Button>
 
@@ -614,16 +612,14 @@
 							<Button
 								variant="outline"
 								size="sm"
-								class="shrink-0"
+								class="shrink-0 whitespace-nowrap"
 								disabled={isOptimizing && optimizeRuns.length === 0}
 								onclick={runOptimize}
 							>
-								<span class={STABLE_CLASS.iconSlot}>
-									{#if isOptimizing}
-										<Loader2Icon class="size-3.5 animate-spin" />
-									{/if}
-								</span>
-								<span class="whitespace-nowrap">{i18n.t('optimizer.run')}</span>
+								{#if isOptimizing}
+									<Loader2Icon class="size-3.5 animate-spin" />
+								{/if}
+								{i18n.t('optimizer.run')}
 							</Button>
 						</div>
 						{#if optimizeRuns.length === 0}
