@@ -40,4 +40,4 @@ devenv tasks run build:web     # production build
 
 Included: backtesting, virtual trades, fees, metrics, optimizer, CSV export, DE/EN UI.
 
-Not included: live trading, broker APIs, multi-asset portfolios, PWA (removed with legacy frontend).
+Not included: live trading, broker APIs, multi-asset portfolios.
