@@ -65,12 +65,28 @@ export const STRINGS = {
 			'Eine Regel, nach der die App rückwirkend entscheidet: kaufen, verkaufen oder halten. SMA und EMA sind Durchschnittslinien.',
 		'strategy.sma': 'Einfacher Durchschnitt (SMA)',
 		'strategy.ema': 'Gewichteter Durchschnitt (EMA)',
+		'strategy.rsi': 'Relative-Stärke-Index (RSI)',
+		'strategy.macd': 'MACD Trendfolge',
+		'strategy.bollinger': 'Bollinger-Bänder',
+		'strategy.crossover': 'SMA-Crossover (Dual)',
 		'param.smaWindow': 'SMA-Zeitraum',
 		'param.smaTooltip':
 			'SMA bedeutet Simple Moving Average: der einfache Durchschnitt der letzten X Kurswerte.',
 		'param.emaWindow': 'EMA-Zeitraum',
 		'param.emaTooltip':
 			'EMA ist ein Durchschnitt, der neue Kurse stärker gewichtet als ältere Kurse.',
+		'param.rsiWindow': 'RSI-Zeitraum',
+		'param.rsiTooltip':
+			'Der Relative Strength Index (RSI) misst die Geschwindigkeit und Dynamik von Preisänderungen, um überkaufte (<30) oder überverkaufte (>70) Zustände zu erkennen.',
+		'param.macdWindow': 'MACD-Zeitraum (Fast)',
+		'param.macdTooltip':
+			'Nutzt das Überkreuzen der MACD-Linie und der Signallinie. Die Slow- und Signal-Zeiträume werden proportional skaliert.',
+		'param.bollingerWindow': 'Bollinger-Zeitraum',
+		'param.bollingerTooltip':
+			'Bollinger-Bänder legen Hüllkurven im Abstand von Standardabweichungen um einen gleitenden Durchschnitt.',
+		'param.crossoverWindow': 'SMA-Crossover (Fast)',
+		'param.crossoverTooltip':
+			'Ein Kauf/Verkauf-Signal entsteht, wenn ein schneller SMA den langsamen SMA kreuzt. Der langsame SMA skaliert proportional (3x).',
 		'capital.start': 'Startkapital',
 		'capital.tooltip':
 			'Virtuelles Geld, mit dem die Simulation startet. Es wird kein echtes Geld verwendet.',
@@ -261,10 +277,26 @@ export const STRINGS = {
 			'A rule the app tests backwards in time: buy, sell, or hold. SMA and EMA are average lines.',
 		'strategy.sma': 'Simple average (SMA)',
 		'strategy.ema': 'Weighted average (EMA)',
+		'strategy.rsi': 'Relative Strength Index (RSI)',
+		'strategy.macd': 'MACD Trend Following',
+		'strategy.bollinger': 'Bollinger Bands',
+		'strategy.crossover': 'SMA Crossover (Dual)',
 		'param.smaWindow': 'SMA period',
 		'param.smaTooltip': 'SMA means Simple Moving Average: the average of the last X price values.',
 		'param.emaWindow': 'EMA period',
 		'param.emaTooltip': 'EMA is an average that gives newer prices more weight than older prices.',
+		'param.rsiWindow': 'RSI period',
+		'param.rsiTooltip':
+			'RSI measures the velocity and magnitude of price movements to identify overbought (<30) or oversold (>70) conditions.',
+		'param.macdWindow': 'MACD period (Fast)',
+		'param.macdTooltip':
+			'Generates signals when the MACD line crosses the Signal line. Slow and signal periods scale proportionally.',
+		'param.bollingerWindow': 'Bollinger period',
+		'param.bollingerTooltip':
+			'Bollinger Bands plot volatility envelopes at standard deviation distances around a central simple average.',
+		'param.crossoverWindow': 'SMA Crossover (Fast)',
+		'param.crossoverTooltip':
+			'Generates signals when the Fast SMA crosses the Slow SMA. The Slow SMA scales proportionally (3x).',
 		'capital.start': 'Starting capital',
 		'capital.tooltip': 'Virtual money used at the start of the simulation. No real money is used.',
 		'fee.label': 'Fee per buy/sell (%)',

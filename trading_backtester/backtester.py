@@ -93,9 +93,10 @@ def _max_drawdown_percent(capitals: list[float]) -> float:
     return max_drawdown * 100
 
 
-def _parameter_grid(strategy_type: str) -> list[dict[str, int]]:
+def _parameter_grid(strategy_type: str) -> list[dict[str, Any]]:
     """Return the parameter grid used by the optimizer for one strategy."""
-    if strategy_type in {StrategyType.SMA.value, StrategyType.EMA.value}:
+    strategy_key = strategy_type.lower().strip()
+    if strategy_key in {"sma", "ema", "rsi", "bollinger", "crossover", "macd"}:
         return [{"window": window} for window in range(5, 101, 5)]
 
     raise ValueError(f"Cannot optimize unknown strategy: {strategy_type}")
@@ -295,14 +296,15 @@ def optimize_strategy_parameters(
 ) -> list[dict[str, Any]]:
     """Return the top five parameter combinations for the selected strategy.
 
-    The optimizer is a deterministic grid search. It is intentionally limited
-    to small grids so that students can understand the search space and the
-    dashboard can respond quickly on typical local machines.
+    The optimizer is a deterministic grid search. It is evaluated in parallel
+    using a thread pool to avoid blocking the event loop.
     """
-    strategy_key = normalize_strategy_type(strategy_type)
-    runs = []
+    import concurrent.futures
 
-    for params in _parameter_grid(strategy_key):
+    strategy_key = normalize_strategy_type(strategy_type)
+    grid = _parameter_grid(strategy_key)
+
+    def evaluate_params(params: dict[str, Any]) -> dict[str, Any]:
         res = run_backtest(
             price_data=price_data,
             starting_capital=starting_capital,
@@ -310,18 +312,19 @@ def optimize_strategy_parameters(
             strategy_type=strategy_key,
             **params,
         )
-        runs.append(
-            {
-                "params": params,
-                "end_capital": float(res.end_capital),
-                "profit_loss": float(res.profit_loss),
-                "profit_loss_percent": float(res.profit_loss_percent),
-                "sharpe_ratio": float(res.sharpe_ratio),
-                "max_drawdown": float(res.max_drawdown),
-                "win_rate": float(res.win_rate),
-                "total_trades": int(res.buy_trades + res.sell_trades),
-            }
-        )
+        return {
+            "params": params,
+            "end_capital": float(res.end_capital),
+            "profit_loss": float(res.profit_loss),
+            "profit_loss_percent": float(res.profit_loss_percent),
+            "sharpe_ratio": float(res.sharpe_ratio),
+            "max_drawdown": float(res.max_drawdown),
+            "win_rate": float(res.win_rate),
+            "total_trades": int(res.buy_trades + res.sell_trades),
+        }
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        runs = list(executor.map(evaluate_params, grid))
 
     runs.sort(
         key=lambda r: (r["profit_loss_percent"], r["sharpe_ratio"]),

@@ -47,5 +47,8 @@ def test_api_optimize():
 
     with TestClient(app=app) as client:
         response = client.post("/api/optimize", json=payload)
-    assert response.status_code == 503
-    assert "archived" in response.json()["detail"].lower()
+    assert response.status_code == 200
+    data = response.json()
+    assert "runs" in data
+    assert len(data["runs"]) > 0
+    assert "params" in data["runs"][0]

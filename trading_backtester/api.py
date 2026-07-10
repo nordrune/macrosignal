@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 MAX_PRICE_POINTS = 10_000
 # ponytail: archived optimizer API; set OPTIMIZER_ENABLED True to restore route
-OPTIMIZER_ENABLED = False
+OPTIMIZER_ENABLED = True
 
 
 class TickerNotFoundError(ValueError):

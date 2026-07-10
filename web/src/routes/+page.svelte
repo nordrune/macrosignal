@@ -121,7 +121,7 @@
 	const TICKER_AUTORUN_MS = 800;
 	const DEFAULT_AUTORUN_MS = 350;
 	// ponytail: archived optimizer panel; set true to restore UI and auto-run hook
-	const OPTIMIZER_ENABLED = false;
+	const OPTIMIZER_ENABLED = true;
 
 	const legend = $derived(getLegendConfig(strategy));
 	const selectedPoint = $derived(
@@ -380,8 +380,12 @@
 				class="mx-auto flex max-w-7xl flex-col items-center gap-2 px-2 py-3 text-center sm:gap-3 sm:px-4 sm:py-4 lg:flex-row lg:items-center lg:justify-between lg:px-6 lg:text-left"
 			>
 				<div class="min-w-0">
-					<h1 class="text-xl font-semibold tracking-tight">
-						MacroSignal <span class="text-muted-foreground">{i18n.t('header.productSuffix')}</span>
+					<h1
+						class="from-primary bg-gradient-to-r to-emerald-400 bg-clip-text text-xl font-extrabold tracking-tight text-transparent drop-shadow-[0_0_12px_rgba(0,230,195,0.2)]"
+					>
+						MacroSignal <span class="text-foreground/80 text-sm font-medium"
+							>{i18n.t('header.productSuffix')}</span
+						>
 					</h1>
 				</div>
 
@@ -698,7 +702,15 @@
 											</Table.TableHeader>
 											<Table.TableBody>
 												{#each optimizeRuns as run, i (i)}
-													<Table.TableRow>
+													<Table.TableRow
+														class="hover:bg-muted/40 cursor-pointer transition-colors"
+														onclick={() => {
+															if (run.params.window !== undefined) {
+																windowSize = String(run.params.window);
+																void runAutoUpdate();
+															}
+														}}
+													>
 														<Table.TableCell class="text-xs">{i + 1}</Table.TableCell>
 														<Table.TableCell class="font-mono text-xs"
 															>{formatKeyValueParams(run.params)}</Table.TableCell

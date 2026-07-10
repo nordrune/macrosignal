@@ -54,11 +54,11 @@
 	let hoverIndex = $state<number | null>(null);
 
 	function chartMargin() {
-		if (!browser) return { top: 12, right: 16, bottom: 12, left: 54 };
+		if (!browser) return { top: 12, right: 16, bottom: 22, left: 54 };
 		const narrow = window.innerWidth < 640;
 		return narrow
-			? { top: 8, right: 2, bottom: 8, left: 30 }
-			: { top: 12, right: 16, bottom: 12, left: 54 };
+			? { top: 8, right: 2, bottom: 18, left: 30 }
+			: { top: 12, right: 16, bottom: 22, left: 54 };
 	}
 
 	function getChartHelpers(
@@ -252,6 +252,32 @@
 			priceHelpers.ctx.stroke();
 		});
 
+		// Draw X-axis dates
+		const narrow = browser && window.innerWidth < 640;
+		priceHelpers.ctx.fillStyle = colors.label;
+		priceHelpers.ctx.font = narrow ? '7.5px system-ui' : '8.5px system-ui';
+		priceHelpers.ctx.textAlign = 'center';
+
+		// Start date
+		priceHelpers.ctx.fillText(
+			data[0].date,
+			priceHelpers.xForIdx(0) + (narrow ? 16 : 24),
+			priceHelpers.height + priceHelpers.margin.top + 13
+		);
+		// Middle date
+		const midIdx = Math.floor(len / 2);
+		priceHelpers.ctx.fillText(
+			data[midIdx].date,
+			priceHelpers.xForIdx(midIdx),
+			priceHelpers.height + priceHelpers.margin.top + 13
+		);
+		// End date
+		priceHelpers.ctx.fillText(
+			data[len - 1].date,
+			priceHelpers.xForIdx(len - 1) - (narrow ? 16 : 24),
+			priceHelpers.height + priceHelpers.margin.top + 13
+		);
+
 		const activePointIndex = hoverIndex ?? selectedPointIndex;
 		if (activePointIndex !== null) {
 			const hx = priceHelpers.xForIdx(activePointIndex);
@@ -320,13 +346,23 @@
 			lineProgress
 		);
 
-		if (activePointIndex !== null) {
+		if (activePointIndex !== null && ddVals[activePointIndex]) {
 			const hx = subHelpers.xForIdx(activePointIndex);
+			const hy = subHelpers.yForVal(ddVals[activePointIndex].value);
 			subHelpers.ctx.strokeStyle = withAlpha(colors.ma, 0.3);
 			subHelpers.ctx.lineWidth = 1;
 			subHelpers.ctx.beginPath();
 			subHelpers.ctx.moveTo(hx, subHelpers.margin.top);
 			subHelpers.ctx.lineTo(hx, subHelpers.rect.height - subHelpers.margin.bottom);
+			subHelpers.ctx.stroke();
+
+			// Highlight circle on drawdown subchart
+			subHelpers.ctx.beginPath();
+			subHelpers.ctx.arc(hx, hy, 4, 0, 2 * Math.PI);
+			subHelpers.ctx.fillStyle = colors.sell;
+			subHelpers.ctx.fill();
+			subHelpers.ctx.strokeStyle = colors.markerStroke;
+			subHelpers.ctx.lineWidth = 1.2;
 			subHelpers.ctx.stroke();
 		}
 	}

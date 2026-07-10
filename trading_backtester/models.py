@@ -22,6 +22,10 @@ class StrategyType(StrEnum):
 
     SMA = "sma"
     EMA = "ema"
+    RSI = "rsi"
+    MACD = "macd"
+    BOLLINGER = "bollinger"
+    CROSSOVER = "crossover"
 
 
 def normalize_strategy_type(strategy_type: str | StrategyType) -> str:

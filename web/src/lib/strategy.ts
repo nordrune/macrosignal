@@ -1,6 +1,6 @@
 /** Strategy parameter and chart-legend helpers for SMA / EMA. */
 
-export type StrategyType = 'sma' | 'ema';
+export type StrategyType = 'sma' | 'ema' | 'rsi' | 'macd' | 'bollinger' | 'crossover';
 
 export const DEFAULT_WINDOW = 20;
 
@@ -10,10 +10,14 @@ export type StrategyLegend = {
 
 const LEGEND_CONFIG: Record<StrategyType, StrategyLegend> = {
 	sma: { label: 'SMA' },
-	ema: { label: 'EMA' }
+	ema: { label: 'EMA' },
+	rsi: { label: 'RSI' },
+	macd: { label: 'MACD' },
+	bollinger: { label: 'Bollinger' },
+	crossover: { label: 'SMA Crossover' }
 };
 
-// ponytail: sma and ema share one window param, same backend shape
+// ponytail: all strategies share one primary window param, same backend shape
 function parseWindow(value: string | number, fallback = DEFAULT_WINDOW): number {
 	const parsed = typeof value === 'number' ? value : parseInt(value, 10);
 	return Number.isFinite(parsed) ? parsed : fallback;
