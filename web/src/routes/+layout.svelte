@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
+	import SignalScoutChat from '$lib/components/SignalScoutChat.svelte';
 	import { createI18n, setI18n } from '$lib/i18n';
 	import { FAVICON, META_THEME_COLOR, PWA_ICON } from '$lib/theme';
 	import '../app.css';
@@ -35,4 +36,5 @@
 
 <div class="min-h-screen overflow-x-clip">
 	{@render children()}
+	<SignalScoutChat />
 </div>
