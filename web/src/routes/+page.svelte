@@ -28,14 +28,18 @@
 	import {
 		DEFAULT_DASHBOARD_SETTINGS,
 		readDashboardState,
-		writeDashboardState
+		writeDashboardState,
+		type Portfolio,
+		type PortfolioAsset,
+		type SimulationPersisted
 	} from '$lib/dashboard-state';
 	import {
+		ASSET_OPTIONS,
+		type AssetOption,
 		capPricePoints,
 		DEFAULT_FEE_PERCENT,
 		DEFAULT_STARTING_CAPITAL,
-		MAX_TRADE_TABLE_ROWS,
-		TICKER_SUGGESTIONS
+		MAX_TRADE_TABLE_ROWS
 	} from '$lib/defaults';
 	import { SAMPLE_CSV, parseCsvText } from '$lib/csv';
 	import type { RunSnapshot } from '$lib/export';
@@ -70,10 +74,17 @@
 	import { onMount } from 'svelte';
 	import ArrowDownIcon from '@lucide/svelte/icons/arrow-down';
 	import ArrowUpIcon from '@lucide/svelte/icons/arrow-up';
+	import CheckIcon from '@lucide/svelte/icons/check';
+	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import CircleHelpIcon from '@lucide/svelte/icons/circle-help';
+	import CopyIcon from '@lucide/svelte/icons/copy';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
+	import PlusIcon from '@lucide/svelte/icons/plus';
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
+	import SearchIcon from '@lucide/svelte/icons/search';
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
+	import Trash2Icon from '@lucide/svelte/icons/trash-2';
+	import XIcon from '@lucide/svelte/icons/x';
 
 	const TRADE_COLUMNS: { key: TradeSortKey; label: StringKey }[] = [
 		{ key: 'date', label: 'table.date' },
@@ -86,28 +97,46 @@
 
 	const i18n = getI18n();
 	const saved = readDashboardState();
+	const initialSimulations = saved.simulations?.length
+		? saved.simulations
+		: [createSimulationFromSettings(saved)];
+	const initialSimulationIndex = Math.min(
+		Math.max(saved.activeSimulationIndex ?? 0, 0),
+		initialSimulations.length - 1
+	);
+	const initialSimulation = initialSimulations[initialSimulationIndex] ?? initialSimulations[0];
 
-	let dataSource = $state<DataSource>(saved.dataSource ?? 'api');
-	let ticker = $state(saved.ticker ?? 'BTC-USD');
-	let period = $state<Period>(saved.period ?? '1y');
-	let interval = $state<Interval>(saved.interval ?? '1d');
-	let csvText = $state(saved.csvText ?? SAMPLE_CSV);
-	let strategy = $state<StrategyType>(saved.strategy ?? 'sma');
-	let windowSize = $state(saved.windowSize ?? String(DEFAULT_WINDOW));
-	let startingCapital = $state(saved.startingCapital ?? String(DEFAULT_STARTING_CAPITAL));
-	let feeRate = $state(saved.feeRate ?? String(DEFAULT_FEE_PERCENT));
-	let autoRun = $state(saved.autoRun ?? true);
+	let simulations = $state.raw<SimulationPersisted[]>(initialSimulations);
+	let activeSimulationIndex = $state(initialSimulationIndex);
+	let dataSource = $state<DataSource>(initialSimulation.dataSource);
+	let ticker = $state(initialSimulation.ticker);
+	let portfolioId = $state<string | null>(initialSimulation.portfolioId);
+	let assetSearch = $state(assetSearchLabel(initialSimulation.ticker));
+	let assetDropdownOpen = $state(false);
+	let portfolioAssetSearch = $state<Record<number, string>>({});
+	let openPortfolioAssetIndex = $state<number | null>(null);
+	let period = $state<Period>(initialSimulation.period);
+	let interval = $state<Interval>(initialSimulation.interval);
+	let csvText = $state(initialSimulation.csvText);
+	let strategy = $state<StrategyType>(initialSimulation.strategy);
+	let windowSize = $state(initialSimulation.windowSize);
+	let startingCapital = $state(initialSimulation.startingCapital);
+	let feeRate = $state(initialSimulation.feeRate);
+	let autoRun = $state(initialSimulation.autoRun);
 	let csvDropActive = $state(false);
+	let portfolioModalOpen = $state(false);
+	let portfolios = $state.raw<Portfolio[]>(saved.portfolios ?? []);
+	let activePortfolioIndex = $state(saved.activePortfolioIndex ?? 0);
 
 	let isRunning = $state(false);
 	let isOptimizing = $state(false);
 	let statusMessage = $state('');
 	let statusType = $state<StatusType>('info');
 
-	let result = $state.raw<BacktestResponse | null>(saved.result ?? null);
-	let runSnapshot = $state<RunSnapshot | null>(saved.runSnapshot ?? null);
-	let analytics = $state.raw<SimulationAnalytics | null>(saved.analytics ?? null);
-	let optimizeRuns = $state.raw<OptimizeRun[]>(saved.optimizeRuns ?? []);
+	let result = $state.raw<BacktestResponse | null>(initialSimulation.result);
+	let runSnapshot = $state<RunSnapshot | null>(initialSimulation.runSnapshot);
+	let analytics = $state.raw<SimulationAnalytics | null>(initialSimulation.analytics);
+	let optimizeRuns = $state.raw<OptimizeRun[]>(initialSimulation.optimizeRuns);
 	let selectedPointIndex = $state<number | null>(null);
 	let selectedTradeIndex = $state<number | null>(null);
 	let tradeSortKey = $state<TradeSortKey>('date');
@@ -136,6 +165,370 @@
 	);
 	const displayedTrades = $derived(sortedTrades.slice(0, MAX_TRADE_TABLE_ROWS));
 	const tradesTruncated = $derived(sortedTrades.length > MAX_TRADE_TABLE_ROWS);
+	const filteredAssetOptions = $derived(filterAssetOptions(assetSearch));
+	const selectedAsset = $derived(findAssetOption(ticker));
+	const sourceTab = $derived(dataSource === 'csv' ? 'csv' : 'market');
+	const assetSelectionActive = $derived(dataSource === 'api' && ticker.trim().length >= 2);
+	const portfolioSelectionActive = $derived(dataSource === 'portfolio' && portfolioId !== null);
+	const activePortfolio = $derived(portfolios[activePortfolioIndex] ?? null);
+	const selectedPortfolio = $derived(
+		portfolioId ? (portfolios.find((portfolio) => portfolio.id === portfolioId) ?? null) : null
+	);
+	const totalPortfolioWeight = $derived(
+		activePortfolio?.assets.reduce((sum, asset) => sum + (parseFloat(asset.weight) || 0), 0) ?? 0
+	);
+
+	function createId(prefix: string): string {
+		return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+	}
+
+	function createSimulationFromSettings(
+		settings: Partial<SimulationPersisted> = {}
+	): SimulationPersisted {
+		return {
+			dataSource: settings.dataSource ?? DEFAULT_DASHBOARD_SETTINGS.dataSource,
+			ticker: settings.ticker ?? DEFAULT_DASHBOARD_SETTINGS.ticker,
+			portfolioId: settings.portfolioId ?? DEFAULT_DASHBOARD_SETTINGS.portfolioId,
+			period: settings.period ?? DEFAULT_DASHBOARD_SETTINGS.period,
+			interval: settings.interval ?? DEFAULT_DASHBOARD_SETTINGS.interval,
+			csvText: settings.csvText ?? DEFAULT_DASHBOARD_SETTINGS.csvText,
+			strategy: settings.strategy ?? DEFAULT_DASHBOARD_SETTINGS.strategy,
+			windowSize: settings.windowSize ?? DEFAULT_DASHBOARD_SETTINGS.windowSize,
+			startingCapital: settings.startingCapital ?? DEFAULT_DASHBOARD_SETTINGS.startingCapital,
+			feeRate: settings.feeRate ?? DEFAULT_DASHBOARD_SETTINGS.feeRate,
+			autoRun: settings.autoRun ?? DEFAULT_DASHBOARD_SETTINGS.autoRun,
+			result: settings.result ?? null,
+			runSnapshot: settings.runSnapshot ?? null,
+			analytics: settings.analytics ?? null,
+			optimizeRuns: settings.optimizeRuns ?? []
+		};
+	}
+
+	function currentSimulation(): SimulationPersisted {
+		return {
+			dataSource,
+			ticker,
+			portfolioId,
+			period,
+			interval,
+			csvText,
+			strategy,
+			windowSize,
+			startingCapital,
+			feeRate,
+			autoRun,
+			result,
+			runSnapshot,
+			analytics,
+			optimizeRuns
+		};
+	}
+
+	function saveCurrentSimulation() {
+		simulations = simulations.map((simulation, index) =>
+			index === activeSimulationIndex ? currentSimulation() : simulation
+		);
+	}
+
+	function loadSimulation(index: number) {
+		const simulation = simulations[index];
+		if (!simulation) return;
+		dataSource = simulation.dataSource;
+		ticker = simulation.ticker;
+		portfolioId = simulation.portfolioId;
+		assetSearch = assetSearchLabel(simulation.ticker);
+		assetDropdownOpen = false;
+		period = simulation.period;
+		interval = simulation.interval;
+		csvText = simulation.csvText;
+		strategy = simulation.strategy;
+		windowSize = simulation.windowSize;
+		startingCapital = simulation.startingCapital;
+		feeRate = simulation.feeRate;
+		autoRun = simulation.autoRun;
+		result = simulation.result;
+		runSnapshot = simulation.runSnapshot;
+		analytics = simulation.analytics;
+		optimizeRuns = simulation.optimizeRuns;
+		selectedPointIndex = null;
+		selectedTradeIndex = null;
+		setStatus(
+			simulation.result ? i18n.t('status.done') : '',
+			simulation.result ? 'success' : 'info'
+		);
+	}
+
+	function switchSimulation(index: number) {
+		if (index === activeSimulationIndex) return;
+		saveCurrentSimulation();
+		activeSimulationIndex = index;
+		loadSimulation(index);
+	}
+
+	function addSimulation(seed: SimulationPersisted = createSimulationFromSettings()) {
+		saveCurrentSimulation();
+		simulations = [...simulations, seed];
+		activeSimulationIndex = simulations.length - 1;
+		loadSimulation(activeSimulationIndex);
+		schedulePersist();
+		if (seed.autoRun) scheduleAutoRun();
+	}
+
+	function duplicateSimulation() {
+		addSimulation({
+			...currentSimulation(),
+			result: null,
+			runSnapshot: null,
+			analytics: null,
+			optimizeRuns: []
+		});
+	}
+
+	function addPortfolio(seed?: Partial<Portfolio>) {
+		const portfolio: Portfolio = {
+			id: seed?.id ?? createId('portfolio'),
+			name: seed?.name ?? `Portfolio ${portfolios.length + 1}`,
+			assets: seed?.assets?.length
+				? seed.assets
+				: [
+						{ symbol: 'BTC-USD', label: 'Bitcoin', weight: '50' },
+						{ symbol: 'SPY', label: 'S&P 500 ETF', weight: '50' }
+					]
+		};
+		portfolios = [...portfolios, portfolio];
+		activePortfolioIndex = portfolios.length - 1;
+		portfolioId = portfolio.id;
+		ticker = '';
+		assetSearch = '';
+		assetDropdownOpen = false;
+		dataSource = 'portfolio';
+		schedulePersist();
+	}
+
+	function updateActivePortfolio(next: Portfolio) {
+		portfolios = portfolios.map((portfolio, index) =>
+			index === activePortfolioIndex ? next : portfolio
+		);
+	}
+
+	function updatePortfolioName(name: string) {
+		if (!activePortfolio) return;
+		updateActivePortfolio({ ...activePortfolio, name });
+	}
+
+	function updatePortfolioAsset(index: number, patch: Partial<PortfolioAsset>) {
+		if (!activePortfolio) return;
+		const assets = activePortfolio.assets.map((asset, i) =>
+			i === index ? { ...asset, ...patch } : asset
+		);
+		updateActivePortfolio({ ...activePortfolio, assets });
+	}
+
+	function updatePortfolioSymbol(index: number, value: string) {
+		const rawValue = value.trim();
+		const exact = ASSET_OPTIONS.find(
+			(asset) =>
+				asset.symbol.toUpperCase() === normalizeTickerSymbol(rawValue) ||
+				asset.label.toLowerCase() === rawValue.toLowerCase() ||
+				(asset.aliases ?? []).some((alias) => alias.toLowerCase() === rawValue.toLowerCase())
+		);
+		if (exact) {
+			applyPortfolioAsset(index, exact);
+			return;
+		}
+		if (!isTickerLike(rawValue)) {
+			portfolioAssetSearch = { ...portfolioAssetSearch, [index]: value };
+			openPortfolioAssetIndex = index;
+			return;
+		}
+		const symbol = normalizeTickerSymbol(rawValue);
+		const asset = findAssetOption(symbol);
+		portfolioAssetSearch = { ...portfolioAssetSearch, [index]: value };
+		openPortfolioAssetIndex = index;
+		updatePortfolioAsset(index, {
+			symbol,
+			label: asset?.label ?? symbol
+		});
+	}
+
+	function portfolioAssetSearchValue(asset: PortfolioAsset, index: number): string {
+		return portfolioAssetSearch[index] ?? assetSearchLabel(asset.symbol);
+	}
+
+	function filteredPortfolioAssetOptions(index: number, asset: PortfolioAsset): AssetOption[] {
+		return filterAssetOptions(portfolioAssetSearchValue(asset, index));
+	}
+
+	function applyPortfolioAsset(index: number, asset: AssetOption) {
+		portfolioAssetSearch = { ...portfolioAssetSearch, [index]: assetSearchLabel(asset.symbol) };
+		openPortfolioAssetIndex = null;
+		updatePortfolioAsset(index, {
+			symbol: asset.symbol,
+			label: asset.label
+		});
+	}
+
+	function applyCustomPortfolioAsset(index: number) {
+		const search = portfolioAssetSearch[index] ?? '';
+		if (!isTickerLike(search)) return;
+		const symbol = normalizeTickerSymbol(search);
+		portfolioAssetSearch = { ...portfolioAssetSearch, [index]: assetSearchLabel(symbol) };
+		openPortfolioAssetIndex = null;
+		updatePortfolioAsset(index, {
+			symbol,
+			label: findAssetOption(symbol)?.label ?? symbol
+		});
+	}
+
+	function handlePortfolioAssetKeydown(e: KeyboardEvent, index: number, asset: PortfolioAsset) {
+		if (e.key === 'Escape') {
+			openPortfolioAssetIndex = null;
+			portfolioAssetSearch = { ...portfolioAssetSearch, [index]: assetSearchLabel(asset.symbol) };
+			return;
+		}
+		if (e.key !== 'Enter') return;
+		e.preventDefault();
+		const first = filteredPortfolioAssetOptions(index, asset)[0];
+		if (first) applyPortfolioAsset(index, first);
+		else applyCustomPortfolioAsset(index);
+	}
+
+	function addPortfolioAsset() {
+		if (!activePortfolio) return;
+		updateActivePortfolio({
+			...activePortfolio,
+			assets: [...activePortfolio.assets, { symbol: '', label: '', weight: '0' }]
+		});
+	}
+
+	function removePortfolioAsset(index: number) {
+		if (!activePortfolio) return;
+		updateActivePortfolio({
+			...activePortfolio,
+			assets: activePortfolio.assets.filter((_, i) => i !== index)
+		});
+	}
+
+	function formatWeight(value: number): string {
+		return value.toFixed(2).replace(/\.?0+$/, '');
+	}
+
+	function normalizePortfolioWeights() {
+		if (!activePortfolio || activePortfolio.assets.length === 0) return;
+		const weights = activePortfolio.assets.map((asset) =>
+			Math.max(parseFloat(asset.weight) || 0, 0)
+		);
+		const total = weights.reduce((sum, weight) => sum + weight, 0);
+		const normalized =
+			total > 0
+				? weights.map((weight) => (weight / total) * 100)
+				: activePortfolio.assets.map(() => 100 / activePortfolio.assets.length);
+		const rounded = normalized.map((weight) => Math.round(weight * 100) / 100);
+		const diff = Math.round((100 - rounded.reduce((sum, weight) => sum + weight, 0)) * 100) / 100;
+		let adjustIndex = -1;
+		for (let i = rounded.length - 1; i >= 0; i--) {
+			if (rounded[i] > 0) {
+				adjustIndex = i;
+				break;
+			}
+		}
+		if (adjustIndex !== -1) rounded[adjustIndex] = Math.max(0, rounded[adjustIndex] + diff);
+		updateActivePortfolio({
+			...activePortfolio,
+			assets: activePortfolio.assets.map((asset, index) => ({
+				...asset,
+				weight: formatWeight(rounded[index] ?? 0)
+			}))
+		});
+	}
+
+	function selectPortfolio(id: string) {
+		portfolioId = id;
+		ticker = '';
+		assetSearch = '';
+		assetDropdownOpen = false;
+		dataSource = 'portfolio';
+		scheduleAutoRun(TICKER_AUTORUN_MS);
+	}
+
+	function clearAssetSelection() {
+		ticker = '';
+		assetSearch = '';
+		assetDropdownOpen = false;
+		dataSource = 'api';
+		schedulePersist();
+	}
+
+	function clearPortfolioSelection() {
+		portfolioId = null;
+		dataSource = 'api';
+		schedulePersist();
+	}
+
+	function findAssetOption(symbol: string): AssetOption | undefined {
+		const normalized = symbol.trim().toUpperCase();
+		return ASSET_OPTIONS.find((asset) => asset.symbol.toUpperCase() === normalized);
+	}
+
+	function assetSearchLabel(symbol: string): string {
+		const asset = findAssetOption(symbol);
+		return asset ? `${asset.label} (${asset.symbol})` : symbol;
+	}
+
+	function normalizeTickerSymbol(value: string): string {
+		return value.trim().toUpperCase();
+	}
+
+	function isTickerLike(value: string): boolean {
+		return /^[A-Z0-9.^=-]{2,18}$/.test(normalizeTickerSymbol(value));
+	}
+
+	function filterAssetOptions(query: string): AssetOption[] {
+		const normalized = query.trim().toLowerCase();
+		if (!normalized) return ASSET_OPTIONS;
+		return ASSET_OPTIONS.filter((asset) => {
+			const haystack =
+				`${asset.label} ${asset.symbol} ${asset.category} ${asset.aliases?.join(' ') ?? ''}`.toLowerCase();
+			return haystack.includes(normalized);
+		});
+	}
+
+	async function buildPortfolioPrices(portfolio: Portfolio) {
+		const assets = portfolio.assets
+			.map((asset) => ({
+				...asset,
+				symbol: normalizeTickerSymbol(asset.symbol),
+				weightValue: parseFloat(asset.weight)
+			}))
+			.filter((asset) => asset.symbol.length >= 2 && Number.isFinite(asset.weightValue));
+		const totalWeight = assets.reduce((sum, asset) => sum + Math.max(asset.weightValue, 0), 0);
+		if (assets.length === 0 || totalWeight <= 0) throw new Error(i18n.t('portfolio.error.empty'));
+
+		const series = await Promise.all(
+			assets.map(async (asset) => ({
+				...asset,
+				normalizedWeight: Math.max(asset.weightValue, 0) / totalWeight,
+				prices: await getTickerPrices(asset.symbol, period, interval)
+			}))
+		);
+		const firstDates = series[0]?.prices.map((point) => point.date) ?? [];
+		const priceMaps = series.map(
+			(asset) => new Map(asset.prices.map((point) => [point.date, point.close]))
+		);
+		const basePrices = series.map((asset) => asset.prices[0]?.close ?? 0);
+		const points = firstDates.flatMap((date) => {
+			if (!priceMaps.every((prices) => prices.has(date))) return [];
+			const close = series.reduce((sum, asset, index) => {
+				const base = basePrices[index];
+				const value = priceMaps[index].get(date);
+				if (!base || !value) return sum;
+				return sum + asset.normalizedWeight * (value / base) * 100;
+			}, 0);
+			return close > 0 ? [{ date, close }] : [];
+		});
+		if (points.length < 2) throw new Error(i18n.t('portfolio.error.overlap'));
+		return points;
+	}
 
 	function setStatus(msg: string, type: StatusType = 'info') {
 		statusMessage = msg;
@@ -160,9 +553,14 @@
 	}
 
 	function persistDashboard() {
+		const latestSimulations = simulations.map((simulation, index) =>
+			index === activeSimulationIndex ? currentSimulation() : simulation
+		);
+		simulations = latestSimulations;
 		writeDashboardState({
 			dataSource,
 			ticker,
+			portfolioId,
 			period,
 			interval,
 			csvText,
@@ -174,7 +572,11 @@
 			result,
 			runSnapshot,
 			analytics,
-			optimizeRuns
+			optimizeRuns,
+			simulations: latestSimulations,
+			activeSimulationIndex,
+			portfolios,
+			activePortfolioIndex
 		});
 	}
 
@@ -187,6 +589,9 @@
 		clearTickerPriceCache();
 		dataSource = DEFAULT_DASHBOARD_SETTINGS.dataSource;
 		ticker = DEFAULT_DASHBOARD_SETTINGS.ticker;
+		portfolioId = DEFAULT_DASHBOARD_SETTINGS.portfolioId;
+		assetSearch = assetSearchLabel(DEFAULT_DASHBOARD_SETTINGS.ticker);
+		assetDropdownOpen = false;
 		period = DEFAULT_DASHBOARD_SETTINGS.period;
 		interval = DEFAULT_DASHBOARD_SETTINGS.interval;
 		csvText = DEFAULT_DASHBOARD_SETTINGS.csvText;
@@ -225,6 +630,9 @@
 			const symbol = ticker.trim().toUpperCase();
 			if (symbol.length < 2) return null;
 			payload.prices = capPricePoints(await getTickerPrices(symbol, period, interval));
+		} else if (dataSource === 'portfolio') {
+			if (!selectedPortfolio) throw new Error(i18n.t('portfolio.error.select'));
+			payload.prices = capPricePoints(await buildPortfolioPrices(selectedPortfolio));
 		} else {
 			payload.prices = capPricePoints(parseCsvText(csvText));
 		}
@@ -247,6 +655,7 @@
 			}
 			const { payload, strategyParams, capital, fee } = built;
 			const isApi = dataSource === 'api';
+			const isPortfolio = dataSource === 'portfolio';
 
 			const response = await postBacktest(payload);
 			if (requestId !== activeRequestId) return;
@@ -254,10 +663,18 @@
 			result = response;
 			analytics = calculateSimulationAnalytics(response);
 			runSnapshot = {
-				dataSource: isApi ? i18n.t('source.yahoo') : i18n.t('source.csv'),
-				asset: isApi ? ticker.trim().toUpperCase() : i18n.t('active.customCsv'),
-				period: isApi ? period : '-',
-				interval: isApi ? interval : '-',
+				dataSource: isApi
+					? i18n.t('source.yahoo')
+					: isPortfolio
+						? i18n.t('source.portfolio')
+						: i18n.t('source.csv'),
+				asset: isApi
+					? ticker.trim().toUpperCase()
+					: isPortfolio
+						? (selectedPortfolio?.name ?? i18n.t('source.portfolio'))
+						: i18n.t('active.customCsv'),
+				period: isApi || isPortfolio ? period : '-',
+				interval: isApi || isPortfolio ? interval : '-',
 				strategy: i18n.t(`strategy.${strategy}` as 'strategy.sma'),
 				strategyParams,
 				startingCapital: capital,
@@ -342,12 +759,55 @@
 
 	function applyTickerSuggestion(symbol: string) {
 		ticker = symbol;
+		portfolioId = null;
+		dataSource = 'api';
+		assetSearch = assetSearchLabel(symbol);
+		assetDropdownOpen = false;
 		scheduleAutoRun(TICKER_AUTORUN_MS);
+	}
+
+	function applyCustomTicker() {
+		if (!isTickerLike(assetSearch)) return;
+		const symbol = normalizeTickerSymbol(assetSearch);
+		ticker = symbol;
+		portfolioId = null;
+		dataSource = 'api';
+		assetSearch = assetSearchLabel(symbol);
+		assetDropdownOpen = false;
+		scheduleAutoRun(TICKER_AUTORUN_MS);
+	}
+
+	function handleAssetSearchInput(value: string) {
+		assetSearch = value;
+		assetDropdownOpen = true;
+		const exact = ASSET_OPTIONS.find(
+			(asset) =>
+				asset.symbol.toUpperCase() === normalizeTickerSymbol(value) ||
+				asset.label.toLowerCase() === value.trim().toLowerCase() ||
+				(asset.aliases ?? []).some((alias) => alias.toLowerCase() === value.trim().toLowerCase())
+		);
+		if (exact) {
+			ticker = exact.symbol;
+			scheduleAutoRun(TICKER_AUTORUN_MS);
+		}
+	}
+
+	function handleAssetKeydown(e: KeyboardEvent) {
+		if (e.key === 'Escape') {
+			assetDropdownOpen = false;
+			return;
+		}
+		if (e.key !== 'Enter') return;
+		e.preventDefault();
+		const first = filteredAssetOptions[0];
+		if (first) applyTickerSuggestion(first.symbol);
+		else applyCustomTicker();
 	}
 
 	$effect(() => {
 		dataSource;
 		ticker;
+		portfolioId;
 		period;
 		interval;
 		csvText;
@@ -360,6 +820,9 @@
 		runSnapshot;
 		analytics;
 		optimizeRuns;
+		activeSimulationIndex;
+		portfolios;
+		activePortfolioIndex;
 		schedulePersist();
 		return () => clearTimeout(persistTimeout);
 	});
@@ -373,7 +836,16 @@
 	});
 </script>
 
-<Tooltip.TooltipProvider>
+{#snippet hoverDescription(label: string)}
+	<span
+		class="tooltip-surface pointer-events-none absolute top-full left-1/2 z-50 mt-2 w-max max-w-48 -translate-x-1/2 rounded-md px-2.5 py-1.5 text-center text-xs opacity-0 shadow-lg transition-opacity delay-0 duration-150 group-focus-within:opacity-100 group-focus-within:delay-0 group-hover:opacity-100 group-hover:delay-1000"
+		role="tooltip"
+	>
+		{label}
+	</span>
+{/snippet}
+
+<Tooltip.TooltipProvider delayDuration={1000}>
 	<div class="flex min-h-screen min-w-0 flex-col">
 		<header class="{SURFACE_CLASS.shell} border-border/60 border-b">
 			<div
@@ -414,23 +886,66 @@
 						{i18n.t('section.settings')}
 					</Card.CardTitle>
 					<Card.CardAction>
-						<Tooltip.Root>
-							<Tooltip.Trigger>
-								<Button
-									variant="ghost"
-									size="icon"
-									class="size-8"
-									aria-label={i18n.t('settings.resetAria')}
-									onclick={resetSettings}
-								>
-									<RotateCcwIcon class="size-4" />
-								</Button>
-							</Tooltip.Trigger>
-							<Tooltip.Content>{i18n.t('settings.resetTooltip')}</Tooltip.Content>
-						</Tooltip.Root>
+						<span class="group relative inline-flex">
+							<Button
+								variant="ghost"
+								size="icon"
+								class="hover:text-primary size-8 hover:rotate-[-10deg]"
+								aria-label={i18n.t('settings.resetAria')}
+								title={i18n.t('settings.resetTooltip')}
+								onclick={resetSettings}
+							>
+								<RotateCcwIcon
+									class="size-4 transition-transform group-hover/button:rotate-[-35deg]"
+								/>
+							</Button>
+							{@render hoverDescription(i18n.t('settings.resetTooltip'))}
+						</span>
 					</Card.CardAction>
 				</Card.CardHeader>
 				<Card.CardContent class="space-y-5">
+					<div class="border-border flex items-center gap-2 border-b pb-4">
+						<div class="flex min-w-0 flex-1 flex-wrap gap-1.5">
+							{#each simulations as _, index (index)}
+								<span class="group relative inline-flex">
+									<Button
+										variant={index === activeSimulationIndex ? 'default' : 'outline'}
+										size="icon-sm"
+										aria-label={i18n.t('simulation.open', { index: index + 1 })}
+										title={i18n.t('simulation.open', { index: index + 1 })}
+										onclick={() => switchSimulation(index)}
+									>
+										{index + 1}
+									</Button>
+									{@render hoverDescription(i18n.t('simulation.open', { index: index + 1 }))}
+								</span>
+							{/each}
+							<span class="group relative inline-flex">
+								<Button
+									variant="outline"
+									size="icon-sm"
+									aria-label={i18n.t('simulation.add')}
+									title={i18n.t('simulation.add')}
+									onclick={() => addSimulation()}
+								>
+									<PlusIcon class="size-4 transition-transform group-hover/button:rotate-90" />
+								</Button>
+								{@render hoverDescription(i18n.t('simulation.add'))}
+							</span>
+						</div>
+						<span class="group relative inline-flex">
+							<Button
+								variant="outline"
+								size="icon-sm"
+								aria-label={i18n.t('simulation.duplicate')}
+								title={i18n.t('simulation.duplicate')}
+								onclick={duplicateSimulation}
+							>
+								<CopyIcon class="size-4" />
+							</Button>
+							{@render hoverDescription(i18n.t('simulation.duplicate'))}
+						</span>
+					</div>
 					<div class="space-y-2">
 						<Label class="flex items-center gap-1.5 text-xs uppercase">
 							{i18n.t('source.label')}
@@ -442,43 +957,157 @@
 							</Tooltip.Root>
 						</Label>
 						<Tabs.Tabs
-							bind:value={dataSource}
+							value={sourceTab}
 							onValueChange={(value) => {
-								if (value === 'csv') clearTickerPriceCache();
+								if (value === 'csv') {
+									clearTickerPriceCache();
+									dataSource = 'csv';
+								} else if (dataSource === 'csv') {
+									dataSource = portfolioId ? 'portfolio' : 'api';
+								}
 								scheduleAutoRun();
 							}}
 						>
 							<Tabs.TabsList class="h-auto w-full">
-								<Tabs.TabsTrigger value="api" class="min-h-10 flex-1 px-2 text-xs whitespace-nowrap"
-									>{i18n.t('source.yahoo')}</Tabs.TabsTrigger
+								<Tabs.TabsTrigger
+									value="market"
+									class="min-h-10 flex-1 px-2 text-xs whitespace-nowrap"
+									>{i18n.t('source.market')}</Tabs.TabsTrigger
 								>
 								<Tabs.TabsTrigger value="csv" class="min-h-10 flex-1 px-2 text-xs whitespace-nowrap"
 									>{i18n.t('source.csv')}</Tabs.TabsTrigger
 								>
 							</Tabs.TabsList>
 
-							<Tabs.TabsContent value="api" class="mt-4 space-y-4">
-								<div class="space-y-2">
-									<Label class="flex items-center gap-1.5 text-xs uppercase">
-										{i18n.t('ticker.label')}
-										<Tooltip.Root>
-											<Tooltip.Trigger class="inline-flex">
-												<CircleHelpIcon class="text-muted-foreground size-3.5" />
-											</Tooltip.Trigger>
-											<Tooltip.Content>{i18n.t('ticker.tooltip')}</Tooltip.Content>
-										</Tooltip.Root>
-									</Label>
+							<Tabs.TabsContent value="market" class="mt-4 space-y-4">
+								<div
+									class={cn(
+										'space-y-2 rounded-lg transition-opacity',
+										portfolioSelectionActive && 'opacity-45'
+									)}
+									title={portfolioSelectionActive ? i18n.t('selection.assetBlocked') : undefined}
+								>
+									<div class="flex items-center justify-between gap-2">
+										<Label class="flex items-center gap-1.5 text-xs uppercase">
+											{i18n.t('ticker.label')}
+											<Tooltip.Root>
+												<Tooltip.Trigger class="inline-flex">
+													<CircleHelpIcon class="text-muted-foreground size-3.5" />
+												</Tooltip.Trigger>
+												<Tooltip.Content>{i18n.t('ticker.tooltip')}</Tooltip.Content>
+											</Tooltip.Root>
+										</Label>
+										{#if assetSelectionActive}
+											<Button variant="ghost" size="sm" onclick={clearAssetSelection}>
+												<XIcon class="size-3.5" />
+												{i18n.t('selection.clearAsset')}
+											</Button>
+										{/if}
+									</div>
 									<div class="flex items-stretch gap-2">
-										<Input
-											bind:value={ticker}
-											placeholder={i18n.t('ticker.placeholder')}
-											class="h-10"
-											oninput={() => scheduleAutoRun(TICKER_AUTORUN_MS)}
-										/>
+										<div
+											class="relative min-w-0 flex-1"
+											onfocusout={(e) => {
+												const nextTarget = e.relatedTarget;
+												if (
+													!(nextTarget instanceof Node) ||
+													!e.currentTarget.contains(nextTarget)
+												) {
+													assetDropdownOpen = false;
+													assetSearch = assetSearchLabel(ticker);
+												}
+											}}
+										>
+											<SearchIcon
+												class="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
+											/>
+											<Input
+												value={assetSearch}
+												placeholder={i18n.t('ticker.placeholder')}
+												class="h-10 pr-9 pl-9"
+												role="combobox"
+												aria-expanded={assetDropdownOpen}
+												aria-controls="asset-options"
+												disabled={portfolioSelectionActive}
+												onfocus={() => {
+													if (!portfolioSelectionActive) assetDropdownOpen = true;
+												}}
+												oninput={(e) => {
+													if (!portfolioSelectionActive)
+														handleAssetSearchInput(e.currentTarget.value);
+												}}
+												onkeydown={handleAssetKeydown}
+											/>
+											<button
+												type="button"
+												class="text-muted-foreground hover:text-foreground disabled:text-muted-foreground/50 absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md disabled:pointer-events-none"
+												aria-label={i18n.t('ticker.openDropdown')}
+												disabled={portfolioSelectionActive}
+												onclick={() => (assetDropdownOpen = !assetDropdownOpen)}
+											>
+												<ChevronDownIcon class="size-4" />
+											</button>
+											{#if assetDropdownOpen && !portfolioSelectionActive}
+												<div
+													id="asset-options"
+													class="border-border bg-popover text-popover-foreground absolute z-40 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border p-1 shadow-lg"
+													role="listbox"
+													tabindex="-1"
+												>
+													{#if filteredAssetOptions.length}
+														{#each filteredAssetOptions as item (item.symbol)}
+															<button
+																type="button"
+																class={cn(
+																	'hover:bg-muted focus:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm outline-none',
+																	item.symbol === ticker && 'bg-muted'
+																)}
+																role="option"
+																aria-selected={item.symbol === ticker}
+																onmousedown={(e) => e.preventDefault()}
+																onclick={() => applyTickerSuggestion(item.symbol)}
+															>
+																<span class="min-w-0 flex-1">
+																	<span class="block truncate font-medium">{item.label}</span>
+																	<span class="text-muted-foreground block truncate text-xs"
+																		>{item.symbol} · {item.category}</span
+																	>
+																</span>
+																{#if item.symbol === ticker}
+																	<CheckIcon class="text-primary size-4" />
+																{/if}
+															</button>
+														{/each}
+													{:else}
+														{#if isTickerLike(assetSearch)}
+															<button
+																type="button"
+																class="hover:bg-muted focus:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm outline-none"
+																onmousedown={(e) => e.preventDefault()}
+																onclick={applyCustomTicker}
+															>
+																<span class="min-w-0 flex-1">
+																	<span class="block truncate font-medium"
+																		>{normalizeTickerSymbol(assetSearch)}</span
+																	>
+																	<span class="text-muted-foreground block truncate text-xs"
+																		>{i18n.t('ticker.customSymbol')}</span
+																	>
+																</span>
+															</button>
+														{:else}
+															<span class="text-muted-foreground block px-2 py-3 text-sm">
+																{i18n.t('ticker.noResults')}
+															</span>
+														{/if}
+													{/if}
+												</div>
+											{/if}
+										</div>
 										<Button
 											variant="outline"
 											class="h-10 shrink-0 px-3"
-											disabled={isRunning}
+											disabled={isRunning || portfolioSelectionActive}
 											onclick={runBacktest}
 										>
 											{#if isRunning}
@@ -487,18 +1116,76 @@
 											{i18n.t('action.loadData')}
 										</Button>
 									</div>
-									<div class="grid grid-cols-3 gap-1.5">
-										{#each TICKER_SUGGESTIONS as item (item.symbol)}
+									<div
+										class="text-muted-foreground flex items-center justify-between gap-2 text-xs"
+									>
+										<span class="min-w-0 truncate"
+											>{selectedAsset
+												? `${selectedAsset.category}: ${selectedAsset.symbol}`
+												: `${i18n.t('ticker.customSymbol')}: ${ticker}`}</span
+										>
+										<span class="shrink-0">{ASSET_OPTIONS.length} Presets</span>
+									</div>
+								</div>
+								<div
+									class={cn(
+										'border-border space-y-2 border-t pt-4 transition-opacity',
+										assetSelectionActive && 'opacity-45'
+									)}
+									title={assetSelectionActive ? i18n.t('selection.portfolioBlocked') : undefined}
+								>
+									<div class="flex items-center justify-between gap-2">
+										<Label class="text-xs uppercase">{i18n.t('portfolio.select')}</Label>
+										<div class="flex items-center gap-1.5">
+											{#if portfolioSelectionActive}
+												<Button variant="ghost" size="sm" onclick={clearPortfolioSelection}>
+													<XIcon class="size-3.5" />
+													{i18n.t('selection.clearPortfolio')}
+												</Button>
+											{/if}
 											<Button
 												variant="outline"
-												size="xs"
-												class="h-7 min-w-0 px-2"
-												onclick={() => applyTickerSuggestion(item.symbol)}
+												size="sm"
+												disabled={assetSelectionActive}
+												onclick={() => {
+													if (portfolios.length === 0) addPortfolio();
+													portfolioModalOpen = true;
+												}}
 											>
-												{item.label}
+												{portfolios.length ? i18n.t('portfolio.edit') : i18n.t('portfolio.create')}
 											</Button>
-										{/each}
+										</div>
 									</div>
+									{#if portfolios.length}
+										<div class="grid gap-1.5">
+											{#each portfolios as portfolio, index (portfolio.id)}
+												<Button
+													variant={portfolio.id === portfolioId && portfolioSelectionActive
+														? 'default'
+														: 'outline'}
+													class="h-auto justify-start px-3 py-2 text-left"
+													disabled={assetSelectionActive}
+													onclick={() => {
+														activePortfolioIndex = index;
+														selectPortfolio(portfolio.id);
+													}}
+												>
+													<span class="min-w-0">
+														<span class="block truncate">{portfolio.name}</span>
+														<span class="block truncate text-xs opacity-75"
+															>{portfolio.assets.length} Assets</span
+														>
+													</span>
+												</Button>
+											{/each}
+										</div>
+									{:else}
+										<div
+											class="border-border text-muted-foreground rounded-lg border px-3 py-4 text-sm"
+										>
+											{i18n.t('portfolio.empty')}
+										</div>
+									{/if}
 								</div>
 								<div class="grid grid-cols-2 gap-3">
 									<div class="space-y-2">
@@ -1177,6 +1864,279 @@
 				</Card.CardContent>
 			</Card.Card>
 		</main>
+
+		{#if portfolioModalOpen}
+			<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3">
+				<section
+					class="{SURFACE_CLASS.shell} border-border max-h-[92vh] w-full max-w-3xl overflow-hidden overscroll-contain rounded-lg border shadow-2xl"
+					aria-labelledby="portfolio-title"
+					onwheel={(e) => e.stopPropagation()}
+					ontouchmove={(e) => e.stopPropagation()}
+				>
+					<header class="border-border flex items-center justify-between gap-3 border-b px-4 py-3">
+						<div class="min-w-0">
+							<h2 id="portfolio-title" class="truncate text-base font-semibold">
+								{i18n.t('portfolio.manager')}
+							</h2>
+							<p class="text-muted-foreground truncate text-xs">
+								{i18n.t('portfolio.managerSubtitle')}
+							</p>
+						</div>
+						<span class="group relative inline-flex">
+							<Button
+								variant="ghost"
+								size="icon"
+								aria-label={i18n.t('portfolio.close')}
+								title={i18n.t('portfolio.close')}
+								onclick={() => (portfolioModalOpen = false)}
+							>
+								<XIcon class="size-4 transition-transform group-hover/button:rotate-90" />
+							</Button>
+							{@render hoverDescription(i18n.t('portfolio.close'))}
+						</span>
+					</header>
+
+					<div class="max-h-[calc(92vh-4.75rem)] space-y-4 overflow-y-auto overscroll-contain p-4">
+						<div class="flex items-center gap-2">
+							<div class="flex min-w-0 flex-1 flex-wrap gap-1.5">
+								{#each portfolios as portfolio, index (portfolio.id)}
+									<span class="group relative inline-flex">
+										<Button
+											variant={index === activePortfolioIndex ? 'default' : 'outline'}
+											size="icon-sm"
+											aria-label={i18n.t('portfolio.open', { index: index + 1 })}
+											title={i18n.t('portfolio.open', { index: index + 1 })}
+											onclick={() => {
+												activePortfolioIndex = index;
+												portfolioId = portfolio.id;
+											}}
+										>
+											{index + 1}
+										</Button>
+										{@render hoverDescription(i18n.t('portfolio.open', { index: index + 1 }))}
+									</span>
+								{/each}
+								<span class="group relative inline-flex">
+									<Button
+										variant="outline"
+										size="icon-sm"
+										aria-label={i18n.t('portfolio.add')}
+										title={i18n.t('portfolio.add')}
+										onclick={() => addPortfolio()}
+									>
+										<PlusIcon class="size-4 transition-transform group-hover/button:rotate-90" />
+									</Button>
+									{@render hoverDescription(i18n.t('portfolio.add'))}
+								</span>
+							</div>
+						</div>
+
+						{#if activePortfolio}
+							<div class="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
+								<div class="space-y-2">
+									<Label class="text-xs uppercase">{i18n.t('portfolio.name')}</Label>
+									<Input
+										value={activePortfolio.name}
+										oninput={(e) => updatePortfolioName(e.currentTarget.value)}
+									/>
+								</div>
+								<div class="flex min-h-8 flex-wrap items-center justify-end gap-2">
+									<div class="text-muted-foreground text-sm">
+										{i18n.t('portfolio.weightTotal', { total: totalPortfolioWeight.toFixed(1) })}
+									</div>
+									<span class="group relative inline-flex">
+										<Button
+											variant="outline"
+											size="sm"
+											disabled={activePortfolio.assets.length === 0}
+											aria-label={i18n.t('portfolio.normalize')}
+											title={i18n.t('portfolio.normalizeTooltip')}
+											onclick={normalizePortfolioWeights}
+										>
+											<SparklesIcon class="size-3.5" />
+											{i18n.t('portfolio.normalize')}
+										</Button>
+										{@render hoverDescription(i18n.t('portfolio.normalizeTooltip'))}
+									</span>
+								</div>
+							</div>
+
+							<div class="space-y-2">
+								<div
+									class="text-muted-foreground grid grid-cols-[minmax(0,1fr)_minmax(8rem,14rem)_2rem] gap-2 px-1 text-xs uppercase"
+								>
+									<span>{i18n.t('portfolio.asset')}</span>
+									<span>{i18n.t('portfolio.weight')}</span>
+									<span></span>
+								</div>
+								{#each activePortfolio.assets as asset, index (index)}
+									<div class="grid grid-cols-[minmax(0,1fr)_minmax(8rem,14rem)_2rem] gap-2">
+										<div
+											class="relative min-w-0"
+											onfocusout={(e) => {
+												const nextTarget = e.relatedTarget;
+												if (
+													!(nextTarget instanceof Node) ||
+													!e.currentTarget.contains(nextTarget)
+												) {
+													openPortfolioAssetIndex = null;
+													portfolioAssetSearch = {
+														...portfolioAssetSearch,
+														[index]: assetSearchLabel(asset.symbol)
+													};
+												}
+											}}
+										>
+											<SearchIcon
+												class="text-muted-foreground pointer-events-none absolute top-4 left-3 size-4 -translate-y-1/2"
+											/>
+											<Input
+												value={portfolioAssetSearchValue(asset, index)}
+												placeholder="AAPL, BTC-USD, EUNL.DE"
+												class="pr-9 pl-9"
+												role="combobox"
+												aria-expanded={openPortfolioAssetIndex === index}
+												aria-controls={`portfolio-asset-options-${index}`}
+												onfocus={() => (openPortfolioAssetIndex = index)}
+												oninput={(e) => updatePortfolioSymbol(index, e.currentTarget.value)}
+												onkeydown={(e) => handlePortfolioAssetKeydown(e, index, asset)}
+											/>
+											<button
+												type="button"
+												class="text-muted-foreground hover:text-foreground absolute top-4 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md"
+												aria-label={i18n.t('ticker.openDropdown')}
+												onclick={() =>
+													(openPortfolioAssetIndex =
+														openPortfolioAssetIndex === index ? null : index)}
+											>
+												<ChevronDownIcon class="size-4" />
+											</button>
+											{#if openPortfolioAssetIndex === index}
+												<div
+													id={`portfolio-asset-options-${index}`}
+													class="border-border bg-popover text-popover-foreground absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border p-1 shadow-lg"
+													role="listbox"
+													tabindex="-1"
+												>
+													{#if filteredPortfolioAssetOptions(index, asset).length}
+														{#each filteredPortfolioAssetOptions(index, asset) as item (item.symbol)}
+															<button
+																type="button"
+																class={cn(
+																	'hover:bg-muted focus:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm outline-none',
+																	item.symbol === asset.symbol && 'bg-muted'
+																)}
+																role="option"
+																aria-selected={item.symbol === asset.symbol}
+																onmousedown={(e) => e.preventDefault()}
+																onclick={() => applyPortfolioAsset(index, item)}
+															>
+																<span class="min-w-0 flex-1">
+																	<span class="block truncate font-medium">{item.label}</span>
+																	<span class="text-muted-foreground block truncate text-xs"
+																		>{item.symbol} · {item.category}</span
+																	>
+																</span>
+																{#if item.symbol === asset.symbol}
+																	<CheckIcon class="text-primary size-4" />
+																{/if}
+															</button>
+														{/each}
+													{:else}
+														{#if isTickerLike(portfolioAssetSearchValue(asset, index))}
+															<button
+																type="button"
+																class="hover:bg-muted focus:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm outline-none"
+																onmousedown={(e) => e.preventDefault()}
+																onclick={() => applyCustomPortfolioAsset(index)}
+															>
+																<span class="min-w-0 flex-1">
+																	<span class="block truncate font-medium"
+																		>{normalizeTickerSymbol(
+																			portfolioAssetSearchValue(asset, index)
+																		)}</span
+																	>
+																	<span class="text-muted-foreground block truncate text-xs"
+																		>{i18n.t('ticker.customSymbol')}</span
+																	>
+																</span>
+															</button>
+														{:else}
+															<span class="text-muted-foreground block px-2 py-3 text-sm">
+																{i18n.t('ticker.noResults')}
+															</span>
+														{/if}
+													{/if}
+												</div>
+											{/if}
+											<div class="text-muted-foreground mt-1 truncate px-1 text-xs">
+												{asset.label || i18n.t('ticker.customSymbol')}
+											</div>
+										</div>
+										<div class="grid gap-2">
+											<Input
+												type="number"
+												min="0"
+												step="0.1"
+												value={asset.weight}
+												oninput={(e) =>
+													updatePortfolioAsset(index, { weight: e.currentTarget.value })}
+											/>
+											<input
+												type="range"
+												min="0"
+												max="100"
+												step="1"
+												value={asset.weight}
+												aria-label={i18n.t('portfolio.weight')}
+												class="accent-primary h-5 w-full cursor-pointer"
+												oninput={(e) =>
+													updatePortfolioAsset(index, { weight: e.currentTarget.value })}
+											/>
+										</div>
+										<span class="group relative inline-flex">
+											<Button
+												variant="ghost"
+												size="icon"
+												class="hover:text-destructive"
+												aria-label={i18n.t('portfolio.removeAsset')}
+												title={i18n.t('portfolio.removeAsset')}
+												onclick={() => removePortfolioAsset(index)}
+											>
+												<Trash2Icon class="size-4" />
+											</Button>
+											{@render hoverDescription(i18n.t('portfolio.removeAsset'))}
+										</span>
+									</div>
+								{/each}
+							</div>
+
+							<div class="flex flex-wrap items-center justify-between gap-2 border-t pt-4">
+								<Button variant="outline" onclick={addPortfolioAsset}>
+									<PlusIcon class="size-4" />
+									{i18n.t('portfolio.addAsset')}
+								</Button>
+								<Button
+									onclick={() => {
+										selectPortfolio(activePortfolio.id);
+										portfolioModalOpen = false;
+									}}
+								>
+									<CheckIcon class="size-4" />
+									{i18n.t('portfolio.use')}
+								</Button>
+							</div>
+						{:else}
+							<div
+								class="border-border text-muted-foreground rounded-lg border px-4 py-8 text-center"
+							>
+								{i18n.t('portfolio.empty')}
+							</div>
+						{/if}
+					</div>
+				</section>
+			</div>
+		{/if}
 
 		<footer
 			class="{SURFACE_CLASS.shell} border-border/60 text-muted-foreground mt-auto space-y-2 border-t px-2 py-4 text-center text-sm sm:px-4 sm:py-6"
