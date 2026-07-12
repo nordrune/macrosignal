@@ -16,6 +16,7 @@ const VERSION = 1;
 export const DEFAULT_DASHBOARD_SETTINGS: DashboardSettings = {
 	dataSource: 'api',
 	ticker: 'BTC-USD',
+	portfolioId: null,
 	period: '1y',
 	interval: '1d',
 	csvText: SAMPLE_CSV,
@@ -29,6 +30,7 @@ export const DEFAULT_DASHBOARD_SETTINGS: DashboardSettings = {
 export type DashboardSettings = {
 	dataSource: DataSource;
 	ticker: string;
+	portfolioId: string | null;
 	period: Period;
 	interval: Interval;
 	csvText: string;
@@ -39,16 +41,42 @@ export type DashboardSettings = {
 	autoRun: boolean;
 };
 
-export type DashboardPersisted = DashboardSettings & {
-	v: typeof VERSION;
+export type PortfolioAsset = {
+	symbol: string;
+	label: string;
+	weight: string;
+};
+
+export type Portfolio = {
+	id: string;
+	name: string;
+	assets: PortfolioAsset[];
+};
+
+export type SimulationPersisted = DashboardSettings & {
 	result: BacktestResponse | null;
 	runSnapshot: RunSnapshot | null;
 	analytics: SimulationAnalytics | null;
 	optimizeRuns: OptimizeRun[];
 };
 
+export type DashboardPersisted = SimulationPersisted & {
+	v: typeof VERSION;
+	simulations: SimulationPersisted[];
+	activeSimulationIndex: number;
+	portfolios: Portfolio[];
+	activePortfolioIndex: number;
+};
+
 function isStrategyType(value: unknown): value is StrategyType {
-	return value === 'sma' || value === 'ema';
+	return (
+		value === 'sma' ||
+		value === 'ema' ||
+		value === 'rsi' ||
+		value === 'macd' ||
+		value === 'bollinger' ||
+		value === 'crossover'
+	);
 }
 
 function isPeriod(value: unknown): value is Period {
@@ -60,7 +88,9 @@ function isInterval(value: unknown): value is Interval {
 }
 
 function parseSettings(raw: Record<string, unknown>): DashboardSettings | null {
-	if (raw.dataSource !== 'api' && raw.dataSource !== 'csv') return null;
+	if (raw.dataSource !== 'api' && raw.dataSource !== 'portfolio' && raw.dataSource !== 'csv') {
+		return null;
+	}
 	if (typeof raw.ticker !== 'string') return null;
 	if (!isPeriod(raw.period)) return null;
 	if (!isInterval(raw.interval)) return null;
@@ -74,6 +104,7 @@ function parseSettings(raw: Record<string, unknown>): DashboardSettings | null {
 	return {
 		dataSource: raw.dataSource,
 		ticker: raw.ticker,
+		portfolioId: typeof raw.portfolioId === 'string' ? raw.portfolioId : null,
 		period: raw.period,
 		interval: raw.interval,
 		csvText: raw.csvText,
@@ -85,10 +116,46 @@ function parseSettings(raw: Record<string, unknown>): DashboardSettings | null {
 	};
 }
 
-function pickSettings(state: DashboardPersisted): DashboardSettings {
+function parseSimulation(raw: Record<string, unknown>): SimulationPersisted | null {
+	const settings = parseSettings(raw);
+	if (!settings) return null;
+	return {
+		...settings,
+		result: raw.result ?? null,
+		runSnapshot: raw.runSnapshot ?? null,
+		analytics: raw.analytics ?? null,
+		optimizeRuns: Array.isArray(raw.optimizeRuns) ? raw.optimizeRuns : []
+	} as SimulationPersisted;
+}
+
+function parsePortfolios(raw: unknown): Portfolio[] {
+	if (!Array.isArray(raw)) return [];
+	return raw.flatMap((item) => {
+		if (!item || typeof item !== 'object') return [];
+		const portfolio = item as Record<string, unknown>;
+		if (typeof portfolio.id !== 'string' || typeof portfolio.name !== 'string') return [];
+		if (!Array.isArray(portfolio.assets)) return [];
+		const assets = portfolio.assets.flatMap((asset) => {
+			if (!asset || typeof asset !== 'object') return [];
+			const row = asset as Record<string, unknown>;
+			if (typeof row.symbol !== 'string') return [];
+			return [
+				{
+					symbol: row.symbol,
+					label: typeof row.label === 'string' ? row.label : row.symbol,
+					weight: typeof row.weight === 'string' ? row.weight : String(row.weight ?? '')
+				}
+			];
+		});
+		return [{ id: portfolio.id, name: portfolio.name, assets }];
+	});
+}
+
+function pickSettings(state: SimulationPersisted): DashboardSettings {
 	const {
 		dataSource,
 		ticker,
+		portfolioId,
 		period,
 		interval,
 		csvText,
@@ -101,6 +168,7 @@ function pickSettings(state: DashboardPersisted): DashboardSettings {
 	return {
 		dataSource,
 		ticker,
+		portfolioId,
 		period,
 		interval,
 		csvText,
@@ -119,16 +187,43 @@ export function readDashboardState(): Partial<DashboardPersisted> {
 		const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null');
 		if (!raw || typeof raw !== 'object' || raw.v !== VERSION) return {};
 
-		const settings = parseSettings(raw as Record<string, unknown>);
+		const rawRecord = raw as Record<string, unknown>;
+		const settings = parseSettings(rawRecord);
 		if (!settings) return {};
-
-		return {
+		const currentSimulation: SimulationPersisted = {
 			...settings,
-			v: VERSION,
 			result: raw.result ?? null,
 			runSnapshot: raw.runSnapshot ?? null,
 			analytics: raw.analytics ?? null,
 			optimizeRuns: Array.isArray(raw.optimizeRuns) ? raw.optimizeRuns : []
+		};
+		const simulations = Array.isArray(raw.simulations)
+			? raw.simulations.flatMap((simulation: unknown) => {
+					if (!simulation || typeof simulation !== 'object') return [];
+					const parsed = parseSimulation(simulation as Record<string, unknown>);
+					return parsed ? [parsed] : [];
+				})
+			: [];
+		const activeSimulationIndex =
+			typeof raw.activeSimulationIndex === 'number' &&
+			raw.activeSimulationIndex >= 0 &&
+			raw.activeSimulationIndex < Math.max(simulations.length, 1)
+				? raw.activeSimulationIndex
+				: 0;
+		const portfolios = parsePortfolios(raw.portfolios);
+
+		return {
+			...currentSimulation,
+			v: VERSION,
+			simulations: simulations.length ? simulations : [currentSimulation],
+			activeSimulationIndex,
+			portfolios,
+			activePortfolioIndex:
+				typeof raw.activePortfolioIndex === 'number' &&
+				raw.activePortfolioIndex >= 0 &&
+				raw.activePortfolioIndex < Math.max(portfolios.length, 1)
+					? raw.activePortfolioIndex
+					: 0
 		};
 	} catch {
 		return {};
@@ -156,7 +251,17 @@ export function writeDashboardState(state: Omit<DashboardPersisted, 'v'>): void 
 				result: null,
 				runSnapshot: null,
 				analytics: null,
-				optimizeRuns: []
+				optimizeRuns: [],
+				simulations: payload.simulations.map((simulation) => ({
+					...pickSettings(simulation),
+					result: null,
+					runSnapshot: null,
+					analytics: null,
+					optimizeRuns: []
+				})),
+				activeSimulationIndex: payload.activeSimulationIndex,
+				portfolios: payload.portfolios,
+				activePortfolioIndex: payload.activePortfolioIndex
 			})
 		);
 	} catch {
