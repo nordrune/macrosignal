@@ -95,6 +95,7 @@ in
       entry = "devenv test --no-tui";
       language = "system";
       pass_filenames = false;
+      always_run = true;
       stages = [ "pre-push" ];
     };
     tokei-stats = {
