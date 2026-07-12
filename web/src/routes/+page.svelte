@@ -7,6 +7,7 @@
 	import PeriodSelect from '$lib/components/PeriodSelect.svelte';
 	import PriceChart from '$lib/components/PriceChart.svelte';
 	import RefreshOverlay from '$lib/components/RefreshOverlay.svelte';
+	import StrategyComparisonChart from '$lib/components/StrategyComparisonChart.svelte';
 	import StrategySelect from '$lib/components/StrategySelect.svelte';
 	import TradeInspector from '$lib/components/TradeInspector.svelte';
 	import { Button } from '$lib/components/ui/button';
@@ -31,7 +32,9 @@
 		writeDashboardState,
 		type Portfolio,
 		type PortfolioAsset,
-		type SimulationPersisted
+		type SimulationPersisted,
+		type StrategyComparison,
+		type StrategyComparisonResult
 	} from '$lib/dashboard-state';
 	import {
 		ASSET_OPTIONS,
@@ -79,6 +82,7 @@
 	import CircleHelpIcon from '@lucide/svelte/icons/circle-help';
 	import CopyIcon from '@lucide/svelte/icons/copy';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
+	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 	import SearchIcon from '@lucide/svelte/icons/search';
@@ -94,6 +98,7 @@
 		{ key: 'fee', label: 'table.fee' },
 		{ key: 'cashBalance', label: 'table.cash' }
 	];
+	const STRATEGIES: StrategyType[] = ['sma', 'ema', 'rsi', 'macd', 'bollinger', 'crossover'];
 
 	const i18n = getI18n();
 	const saved = readDashboardState();
@@ -127,6 +132,10 @@
 	let portfolioModalOpen = $state(false);
 	let portfolios = $state.raw<Portfolio[]>(saved.portfolios ?? []);
 	let activePortfolioIndex = $state(saved.activePortfolioIndex ?? 0);
+	let comparisonModalOpen = $state(false);
+	let strategyComparisons = $state.raw<StrategyComparison[]>(saved.strategyComparisons ?? []);
+	let activeStrategyComparisonIndex = $state(saved.activeStrategyComparisonIndex ?? 0);
+	let isComparing = $state(false);
 
 	let isRunning = $state(false);
 	let isOptimizing = $state(false);
@@ -168,9 +177,9 @@
 	const filteredAssetOptions = $derived(filterAssetOptions(assetSearch));
 	const selectedAsset = $derived(findAssetOption(ticker));
 	const sourceTab = $derived(dataSource === 'csv' ? 'csv' : 'market');
-	const assetSelectionActive = $derived(dataSource === 'api' && ticker.trim().length >= 2);
 	const portfolioSelectionActive = $derived(dataSource === 'portfolio' && portfolioId !== null);
 	const activePortfolio = $derived(portfolios[activePortfolioIndex] ?? null);
+	const activeComparison = $derived(strategyComparisons[activeStrategyComparisonIndex] ?? null);
 	const selectedPortfolio = $derived(
 		portfolioId ? (portfolios.find((portfolio) => portfolio.id === portfolioId) ?? null) : null
 	);
@@ -186,6 +195,7 @@
 		settings: Partial<SimulationPersisted> = {}
 	): SimulationPersisted {
 		return {
+			name: settings.name,
 			dataSource: settings.dataSource ?? DEFAULT_DASHBOARD_SETTINGS.dataSource,
 			ticker: settings.ticker ?? DEFAULT_DASHBOARD_SETTINGS.ticker,
 			portfolioId: settings.portfolioId ?? DEFAULT_DASHBOARD_SETTINGS.portfolioId,
@@ -206,6 +216,7 @@
 
 	function currentSimulation(): SimulationPersisted {
 		return {
+			name: simulations[activeSimulationIndex]?.name,
 			dataSource,
 			ticker,
 			portfolioId,
@@ -277,10 +288,132 @@
 	function duplicateSimulation() {
 		addSimulation({
 			...currentSimulation(),
+			name: `${simulations[activeSimulationIndex]?.name ?? `Simulation ${activeSimulationIndex + 1}`} Copy`,
 			result: null,
 			runSnapshot: null,
 			analytics: null,
 			optimizeRuns: []
+		});
+	}
+
+	function deleteActiveSimulation() {
+		if (simulations.length <= 1) return;
+		const name =
+			simulations[activeSimulationIndex]?.name ?? `Simulation ${activeSimulationIndex + 1}`;
+		if (!confirm(i18n.t('simulation.deleteConfirm', { name }))) return;
+		const nextSimulations = simulations.filter((_, index) => index !== activeSimulationIndex);
+		const nextIndex = Math.min(activeSimulationIndex, nextSimulations.length - 1);
+		simulations = nextSimulations;
+		activeSimulationIndex = nextIndex;
+		loadSimulation(nextIndex);
+		schedulePersist();
+	}
+
+	function updateActiveSimulationName(name: string) {
+		simulations = simulations.map((simulation, index) =>
+			index === activeSimulationIndex ? { ...simulation, name } : simulation
+		);
+	}
+
+	function defaultComparisonStrategies(): StrategyComparison['strategies'] {
+		return {
+			sma: { enabled: true, windowSize: windowSize || '20' },
+			ema: { enabled: true, windowSize: windowSize || '20' },
+			rsi: { enabled: true, windowSize: '14' },
+			macd: { enabled: false, windowSize: '12' },
+			bollinger: { enabled: false, windowSize: '20' },
+			crossover: { enabled: false, windowSize: '20' }
+		};
+	}
+
+	function createComparison(seed: Partial<StrategyComparison> = {}): StrategyComparison {
+		return {
+			id: seed.id ?? createId('comparison'),
+			name: seed.name ?? `Vergleich ${strategyComparisons.length + 1}`,
+			dataSource: seed.dataSource ?? dataSource,
+			ticker: seed.ticker ?? ticker,
+			portfolioId: seed.portfolioId ?? portfolioId,
+			period: seed.period ?? period,
+			interval: seed.interval ?? interval,
+			csvText: seed.csvText ?? csvText,
+			startingCapital: seed.startingCapital ?? startingCapital,
+			feeRate: seed.feeRate ?? feeRate,
+			strategies: seed.strategies ?? defaultComparisonStrategies(),
+			results: seed.results ?? []
+		};
+	}
+
+	function ensureComparison() {
+		if (strategyComparisons.length) return;
+		strategyComparisons = [createComparison()];
+		activeStrategyComparisonIndex = 0;
+	}
+
+	function openStrategyComparison() {
+		ensureComparison();
+		comparisonModalOpen = true;
+		schedulePersist();
+	}
+
+	function updateActiveComparison(patch: Partial<StrategyComparison>) {
+		if (!activeComparison) return;
+		strategyComparisons = strategyComparisons.map((comparison, index) =>
+			index === activeStrategyComparisonIndex ? { ...comparison, ...patch } : comparison
+		);
+	}
+
+	function addComparison(seed?: StrategyComparison) {
+		const next = seed ?? createComparison();
+		strategyComparisons = [...strategyComparisons, next];
+		activeStrategyComparisonIndex = strategyComparisons.length - 1;
+		schedulePersist();
+	}
+
+	function duplicateComparison() {
+		if (!activeComparison) return;
+		addComparison({
+			...activeComparison,
+			id: createId('comparison'),
+			name: `${activeComparison.name} Copy`,
+			results: []
+		});
+	}
+
+	function deleteComparison() {
+		if (strategyComparisons.length <= 1) return;
+		strategyComparisons = strategyComparisons.filter(
+			(_, index) => index !== activeStrategyComparisonIndex
+		);
+		activeStrategyComparisonIndex = Math.max(0, activeStrategyComparisonIndex - 1);
+		schedulePersist();
+	}
+
+	function applyCurrentSettingsToComparison() {
+		if (!activeComparison) return;
+		updateActiveComparison({
+			dataSource,
+			ticker,
+			portfolioId,
+			period,
+			interval,
+			csvText,
+			startingCapital,
+			feeRate,
+			results: []
+		});
+	}
+
+	function updateComparisonStrategy(
+		strategyType: StrategyType,
+		patch: Partial<StrategyComparison['strategies'][StrategyType]>
+	) {
+		if (!activeComparison) return;
+		updateActiveComparison({
+			strategies: {
+				...activeComparison.strategies,
+				[strategyType]: { ...activeComparison.strategies[strategyType], ...patch }
+			},
+			results: []
 		});
 	}
 
@@ -298,9 +431,6 @@
 		portfolios = [...portfolios, portfolio];
 		activePortfolioIndex = portfolios.length - 1;
 		portfolioId = portfolio.id;
-		ticker = '';
-		assetSearch = '';
-		assetDropdownOpen = false;
 		dataSource = 'portfolio';
 		schedulePersist();
 	}
@@ -314,6 +444,35 @@
 	function updatePortfolioName(name: string) {
 		if (!activePortfolio) return;
 		updateActivePortfolio({ ...activePortfolio, name });
+	}
+
+	function editPortfolio(index: number) {
+		activePortfolioIndex = index;
+		portfolioModalOpen = true;
+	}
+
+	function deletePortfolio(index: number) {
+		const portfolio = portfolios[index];
+		if (!portfolio) return;
+		portfolios = portfolios.filter((_, i) => i !== index);
+		if (portfolioId === portfolio.id) {
+			portfolioId = null;
+			if (dataSource === 'portfolio') dataSource = 'api';
+			result = null;
+			runSnapshot = null;
+			analytics = null;
+			optimizeRuns = [];
+		}
+		strategyComparisons = strategyComparisons.map((comparison) =>
+			comparison.portfolioId === portfolio.id
+				? { ...comparison, portfolioId: null, dataSource: 'api' }
+				: comparison
+		);
+		activePortfolioIndex = Math.min(
+			Math.max(0, activePortfolioIndex),
+			Math.max(portfolios.length - 1, 0)
+		);
+		schedulePersist();
 	}
 
 	function updatePortfolioAsset(index: number, patch: Partial<PortfolioAsset>) {
@@ -443,26 +602,25 @@
 	}
 
 	function selectPortfolio(id: string) {
+		if (portfolioId === id && dataSource === 'portfolio') {
+			portfolioId = null;
+			dataSource = 'api';
+			if (ticker.trim().length < 2) {
+				result = null;
+				runSnapshot = null;
+				analytics = null;
+				optimizeRuns = [];
+				setStatus('', 'info');
+				schedulePersist();
+				return;
+			}
+			scheduleAutoRun(TICKER_AUTORUN_MS);
+			return;
+		}
 		portfolioId = id;
-		ticker = '';
-		assetSearch = '';
 		assetDropdownOpen = false;
 		dataSource = 'portfolio';
 		scheduleAutoRun(TICKER_AUTORUN_MS);
-	}
-
-	function clearAssetSelection() {
-		ticker = '';
-		assetSearch = '';
-		assetDropdownOpen = false;
-		dataSource = 'api';
-		schedulePersist();
-	}
-
-	function clearPortfolioSelection() {
-		portfolioId = null;
-		dataSource = 'api';
-		schedulePersist();
 	}
 
 	function findAssetOption(symbol: string): AssetOption | undefined {
@@ -493,7 +651,11 @@
 		});
 	}
 
-	async function buildPortfolioPrices(portfolio: Portfolio) {
+	async function buildPortfolioPrices(
+		portfolio: Portfolio,
+		selectedPeriod = period,
+		selectedInterval = interval
+	) {
 		const assets = portfolio.assets
 			.map((asset) => ({
 				...asset,
@@ -508,7 +670,7 @@
 			assets.map(async (asset) => ({
 				...asset,
 				normalizedWeight: Math.max(asset.weightValue, 0) / totalWeight,
-				prices: await getTickerPrices(asset.symbol, period, interval)
+				prices: await getTickerPrices(asset.symbol, selectedPeriod, selectedInterval)
 			}))
 		);
 		const firstDates = series[0]?.prices.map((point) => point.date) ?? [];
@@ -576,7 +738,9 @@
 			simulations: latestSimulations,
 			activeSimulationIndex,
 			portfolios,
-			activePortfolioIndex
+			activePortfolioIndex,
+			strategyComparisons,
+			activeStrategyComparisonIndex
 		});
 	}
 
@@ -611,10 +775,21 @@
 		scheduleAutoRun();
 	}
 
-	async function buildPayload() {
-		const capital = parseFloat(startingCapital);
-		const fee = parseFloat(feeRate);
-		const strategyParams = getStrategyParams(strategy, windowSize);
+	async function buildPayloadFromSettings(settings: {
+		dataSource: DataSource;
+		ticker: string;
+		portfolioId: string | null;
+		period: Period;
+		interval: Interval;
+		csvText: string;
+		startingCapital: string;
+		feeRate: string;
+		strategy: StrategyType;
+		windowSize: string;
+	}) {
+		const capital = parseFloat(settings.startingCapital);
+		const fee = parseFloat(settings.feeRate);
+		const strategyParams = getStrategyParams(settings.strategy, settings.windowSize);
 
 		if (Number.isNaN(capital) || capital <= 0) throw new Error(i18n.t('error.capital'));
 		if (Number.isNaN(fee) || fee < 0) throw new Error(i18n.t('error.fee'));
@@ -622,22 +797,141 @@
 		const payload: BacktestRequest = {
 			starting_capital: capital,
 			transaction_fee_percent: fee,
-			strategy_type: strategy,
+			strategy_type: settings.strategy,
 			strategy_params: strategyParams
 		};
 
-		if (dataSource === 'api') {
-			const symbol = ticker.trim().toUpperCase();
+		if (settings.dataSource === 'api') {
+			const symbol = settings.ticker.trim().toUpperCase();
 			if (symbol.length < 2) return null;
-			payload.prices = capPricePoints(await getTickerPrices(symbol, period, interval));
-		} else if (dataSource === 'portfolio') {
-			if (!selectedPortfolio) throw new Error(i18n.t('portfolio.error.select'));
-			payload.prices = capPricePoints(await buildPortfolioPrices(selectedPortfolio));
+			payload.prices = capPricePoints(
+				await getTickerPrices(symbol, settings.period, settings.interval)
+			);
+		} else if (settings.dataSource === 'portfolio') {
+			const portfolio = settings.portfolioId
+				? portfolios.find((item) => item.id === settings.portfolioId)
+				: null;
+			if (!portfolio) throw new Error(i18n.t('portfolio.error.select'));
+			payload.prices = capPricePoints(
+				await buildPortfolioPrices(portfolio, settings.period, settings.interval)
+			);
 		} else {
-			payload.prices = capPricePoints(parseCsvText(csvText));
+			payload.prices = capPricePoints(parseCsvText(settings.csvText));
 		}
 
 		return { payload, strategyParams, capital, fee };
+	}
+
+	async function buildPayload() {
+		return buildPayloadFromSettings({
+			dataSource,
+			ticker,
+			portfolioId,
+			period,
+			interval,
+			csvText,
+			startingCapital,
+			feeRate,
+			strategy,
+			windowSize
+		});
+	}
+
+	async function runStrategyComparison() {
+		if (!activeComparison || isComparing) return;
+		const selected = STRATEGIES.filter(
+			(strategyType) => activeComparison.strategies[strategyType]?.enabled
+		);
+		if (!selected.length) {
+			setStatus(i18n.t('comparison.error.empty'), 'error');
+			return;
+		}
+
+		isComparing = true;
+		setStatus(i18n.t('comparison.running'), 'info');
+		try {
+			const runs: StrategyComparisonResult[] = [];
+			for (const strategyType of selected) {
+				const settings = activeComparison.strategies[strategyType];
+				const built = await buildPayloadFromSettings({
+					...activeComparison,
+					strategy: strategyType,
+					windowSize: settings.windowSize
+				});
+				if (!built) continue;
+				runs.push({
+					strategy: strategyType,
+					windowSize: settings.windowSize,
+					result: await postBacktest(built.payload)
+				});
+			}
+			updateActiveComparison({ results: runs });
+			setStatus(i18n.t('comparison.done'), 'success');
+			schedulePersist();
+		} catch (error) {
+			setStatus(statusFromError(error), 'error');
+		} finally {
+			isComparing = false;
+		}
+	}
+
+	function applyComparisonResult(run: StrategyComparisonResult) {
+		if (!activeComparison) return;
+		saveCurrentSimulation();
+		dataSource = activeComparison.dataSource;
+		ticker = activeComparison.ticker;
+		portfolioId = activeComparison.portfolioId;
+		assetSearch = assetSearchLabel(activeComparison.ticker);
+		period = activeComparison.period;
+		interval = activeComparison.interval;
+		csvText = activeComparison.csvText;
+		startingCapital = activeComparison.startingCapital;
+		feeRate = activeComparison.feeRate;
+		strategy = run.strategy;
+		windowSize = run.windowSize;
+		result = run.result;
+		analytics = calculateSimulationAnalytics(run.result);
+		runSnapshot = {
+			dataSource:
+				activeComparison.dataSource === 'api'
+					? i18n.t('source.yahoo')
+					: activeComparison.dataSource === 'portfolio'
+						? i18n.t('source.portfolio')
+						: i18n.t('source.csv'),
+			asset:
+				activeComparison.dataSource === 'api'
+					? activeComparison.ticker.trim().toUpperCase()
+					: activeComparison.dataSource === 'portfolio'
+						? (portfolios.find((item) => item.id === activeComparison.portfolioId)?.name ??
+							i18n.t('source.portfolio'))
+						: i18n.t('active.customCsv'),
+			period: activeComparison.dataSource === 'csv' ? '-' : activeComparison.period,
+			interval: activeComparison.dataSource === 'csv' ? '-' : activeComparison.interval,
+			strategy: i18n.t(`strategy.${run.strategy}` as 'strategy.sma'),
+			strategyParams: getStrategyParams(run.strategy, run.windowSize),
+			startingCapital: parseFloat(activeComparison.startingCapital),
+			feePercent: parseFloat(activeComparison.feeRate),
+			dateStart: run.result.series_data[0]?.date ?? '-',
+			dateEnd: run.result.series_data[run.result.series_data.length - 1]?.date ?? '-',
+			dataPoints: run.result.series_data.length
+		};
+		optimizeRuns = [];
+		selectedPointIndex = null;
+		selectedTradeIndex = null;
+		comparisonModalOpen = false;
+		setStatus(i18n.t('comparison.applied'), 'success');
+		persistDashboard();
+	}
+
+	function comparisonAssetLabel(comparison: StrategyComparison): string {
+		if (comparison.dataSource === 'api') return comparison.ticker.trim().toUpperCase();
+		if (comparison.dataSource === 'portfolio') {
+			return (
+				portfolios.find((portfolio) => portfolio.id === comparison.portfolioId)?.name ??
+				i18n.t('source.portfolio')
+			);
+		}
+		return i18n.t('active.customCsv');
 	}
 
 	async function runBacktest() {
@@ -823,6 +1117,8 @@
 		activeSimulationIndex;
 		portfolios;
 		activePortfolioIndex;
+		strategyComparisons;
+		activeStrategyComparisonIndex;
 		schedulePersist();
 		return () => clearTimeout(persistTimeout);
 	});
@@ -945,6 +1241,28 @@
 							</Button>
 							{@render hoverDescription(i18n.t('simulation.duplicate'))}
 						</span>
+						<span class="group relative inline-flex">
+							<Button
+								variant="ghost"
+								size="icon-sm"
+								class="hover:text-destructive"
+								disabled={simulations.length <= 1}
+								aria-label={i18n.t('simulation.delete')}
+								title={i18n.t('simulation.delete')}
+								onclick={deleteActiveSimulation}
+							>
+								<Trash2Icon class="size-4" />
+							</Button>
+							{@render hoverDescription(i18n.t('simulation.delete'))}
+						</span>
+					</div>
+					<div class="space-y-2">
+						<Label class="text-xs uppercase">{i18n.t('simulation.name')}</Label>
+						<Input
+							value={simulations[activeSimulationIndex]?.name ??
+								`Simulation ${activeSimulationIndex + 1}`}
+							oninput={(e) => updateActiveSimulationName(e.currentTarget.value)}
+						/>
 					</div>
 					<div class="space-y-2">
 						<Label class="flex items-center gap-1.5 text-xs uppercase">
@@ -997,12 +1315,6 @@
 												<Tooltip.Content>{i18n.t('ticker.tooltip')}</Tooltip.Content>
 											</Tooltip.Root>
 										</Label>
-										{#if assetSelectionActive}
-											<Button variant="ghost" size="sm" onclick={clearAssetSelection}>
-												<XIcon class="size-3.5" />
-												{i18n.t('selection.clearAsset')}
-											</Button>
-										{/if}
 									</div>
 									<div class="flex items-stretch gap-2">
 										<div
@@ -1127,26 +1439,13 @@
 										<span class="shrink-0">{ASSET_OPTIONS.length} Presets</span>
 									</div>
 								</div>
-								<div
-									class={cn(
-										'border-border space-y-2 border-t pt-4 transition-opacity',
-										assetSelectionActive && 'opacity-45'
-									)}
-									title={assetSelectionActive ? i18n.t('selection.portfolioBlocked') : undefined}
-								>
+								<div class="border-border space-y-2 border-t pt-4">
 									<div class="flex items-center justify-between gap-2">
 										<Label class="text-xs uppercase">{i18n.t('portfolio.select')}</Label>
 										<div class="flex items-center gap-1.5">
-											{#if portfolioSelectionActive}
-												<Button variant="ghost" size="sm" onclick={clearPortfolioSelection}>
-													<XIcon class="size-3.5" />
-													{i18n.t('selection.clearPortfolio')}
-												</Button>
-											{/if}
 											<Button
 												variant="outline"
 												size="sm"
-												disabled={assetSelectionActive}
 												onclick={() => {
 													if (portfolios.length === 0) addPortfolio();
 													portfolioModalOpen = true;
@@ -1159,24 +1458,55 @@
 									{#if portfolios.length}
 										<div class="grid gap-1.5">
 											{#each portfolios as portfolio, index (portfolio.id)}
-												<Button
-													variant={portfolio.id === portfolioId && portfolioSelectionActive
-														? 'default'
-														: 'outline'}
-													class="h-auto justify-start px-3 py-2 text-left"
-													disabled={assetSelectionActive}
-													onclick={() => {
-														activePortfolioIndex = index;
-														selectPortfolio(portfolio.id);
-													}}
-												>
-													<span class="min-w-0">
-														<span class="block truncate">{portfolio.name}</span>
-														<span class="block truncate text-xs opacity-75"
-															>{portfolio.assets.length} Assets</span
-														>
-													</span>
-												</Button>
+												<div class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5">
+													<Button
+														variant={portfolio.id === portfolioId && portfolioSelectionActive
+															? 'default'
+															: 'outline'}
+														class="h-auto min-w-0 justify-start px-3 py-2 text-left"
+														title={portfolio.id === portfolioId && portfolioSelectionActive
+															? i18n.t('selection.portfolioToggleOff')
+															: i18n.t('selection.portfolioToggleOn')}
+														onclick={() => {
+															activePortfolioIndex = index;
+															selectPortfolio(portfolio.id);
+														}}
+													>
+														<span class="min-w-0">
+															<span class="block truncate">{portfolio.name}</span>
+															<span class="block truncate text-xs opacity-75"
+																>{portfolio.assets.length} Assets</span
+															>
+														</span>
+													</Button>
+													<div class="flex items-center gap-1">
+														<span class="group relative inline-flex">
+															<Button
+																variant="outline"
+																size="icon-sm"
+																aria-label={i18n.t('portfolio.editOne')}
+																title={i18n.t('portfolio.editOne')}
+																onclick={() => editPortfolio(index)}
+															>
+																<PencilIcon class="size-4" />
+															</Button>
+															{@render hoverDescription(i18n.t('portfolio.editOne'))}
+														</span>
+														<span class="group relative inline-flex">
+															<Button
+																variant="ghost"
+																size="icon-sm"
+																class="hover:text-destructive"
+																aria-label={i18n.t('portfolio.delete')}
+																title={i18n.t('portfolio.delete')}
+																onclick={() => deletePortfolio(index)}
+															>
+																<Trash2Icon class="size-4" />
+															</Button>
+															{@render hoverDescription(i18n.t('portfolio.delete'))}
+														</span>
+													</div>
+												</div>
 											{/each}
 										</div>
 									{:else}
@@ -1339,6 +1669,10 @@
 							<Loader2Icon class="size-4 animate-spin" />
 						{/if}
 						{i18n.t('action.run')}
+					</Button>
+					<Button variant="outline" class="min-h-11 w-full" onclick={openStrategyComparison}>
+						<SparklesIcon class="size-4" />
+						{i18n.t('comparison.open')}
 					</Button>
 
 					<!-- ponytail: archived — parameter optimizer UI; restore with OPTIMIZER_ENABLED -->
@@ -1929,6 +2263,20 @@
 									{@render hoverDescription(i18n.t('portfolio.add'))}
 								</span>
 							</div>
+							<span class="group relative inline-flex">
+								<Button
+									variant="ghost"
+									size="icon-sm"
+									class="hover:text-destructive"
+									disabled={!activePortfolio}
+									aria-label={i18n.t('portfolio.delete')}
+									title={i18n.t('portfolio.delete')}
+									onclick={() => deletePortfolio(activePortfolioIndex)}
+								>
+									<Trash2Icon class="size-4" />
+								</Button>
+								{@render hoverDescription(i18n.t('portfolio.delete'))}
+							</span>
 						</div>
 
 						{#if activePortfolio}
@@ -2131,6 +2479,239 @@
 								class="border-border text-muted-foreground rounded-lg border px-4 py-8 text-center"
 							>
 								{i18n.t('portfolio.empty')}
+							</div>
+						{/if}
+					</div>
+				</section>
+			</div>
+		{/if}
+
+		{#if comparisonModalOpen}
+			<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3">
+				<section
+					class="{SURFACE_CLASS.shell} border-border flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden overscroll-contain rounded-lg border shadow-2xl"
+					aria-labelledby="comparison-title"
+					onwheel={(e) => e.stopPropagation()}
+					ontouchmove={(e) => e.stopPropagation()}
+				>
+					<header class="border-border flex items-center justify-between gap-3 border-b px-4 py-3">
+						<div class="min-w-0">
+							<h2 id="comparison-title" class="truncate text-base font-semibold">
+								{i18n.t('comparison.title')}
+							</h2>
+							<p class="text-muted-foreground truncate text-xs">
+								{activeComparison
+									? `${comparisonAssetLabel(activeComparison)} · ${activeComparison.period} · ${activeComparison.interval}`
+									: i18n.t('comparison.subtitle')}
+							</p>
+						</div>
+						<span class="group relative inline-flex">
+							<Button
+								variant="ghost"
+								size="icon"
+								aria-label={i18n.t('comparison.close')}
+								title={i18n.t('comparison.close')}
+								onclick={() => (comparisonModalOpen = false)}
+							>
+								<XIcon class="size-4 transition-transform group-hover/button:rotate-90" />
+							</Button>
+							{@render hoverDescription(i18n.t('comparison.close'))}
+						</span>
+					</header>
+
+					<div class="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4">
+						<div class="flex flex-wrap items-center gap-2">
+							<div class="flex min-w-0 flex-1 flex-wrap gap-1.5">
+								{#each strategyComparisons as comparison, index (comparison.id)}
+									<span class="group relative inline-flex">
+										<Button
+											variant={index === activeStrategyComparisonIndex ? 'default' : 'outline'}
+											size="icon-sm"
+											aria-label={i18n.t('comparison.openTab', { index: index + 1 })}
+											title={i18n.t('comparison.openTab', { index: index + 1 })}
+											onclick={() => (activeStrategyComparisonIndex = index)}
+										>
+											{index + 1}
+										</Button>
+										{@render hoverDescription(i18n.t('comparison.openTab', { index: index + 1 }))}
+									</span>
+								{/each}
+								<span class="group relative inline-flex">
+									<Button
+										variant="outline"
+										size="icon-sm"
+										aria-label={i18n.t('comparison.add')}
+										title={i18n.t('comparison.add')}
+										onclick={() => addComparison()}
+									>
+										<PlusIcon class="size-4 transition-transform group-hover/button:rotate-90" />
+									</Button>
+									{@render hoverDescription(i18n.t('comparison.add'))}
+								</span>
+							</div>
+							<span class="group relative inline-flex">
+								<Button
+									variant="outline"
+									size="icon-sm"
+									aria-label={i18n.t('comparison.duplicate')}
+									title={i18n.t('comparison.duplicate')}
+									onclick={duplicateComparison}
+								>
+									<CopyIcon class="size-4" />
+								</Button>
+								{@render hoverDescription(i18n.t('comparison.duplicate'))}
+							</span>
+							<span class="group relative inline-flex">
+								<Button
+									variant="ghost"
+									size="icon-sm"
+									class="hover:text-destructive"
+									disabled={strategyComparisons.length <= 1}
+									aria-label={i18n.t('comparison.delete')}
+									title={i18n.t('comparison.delete')}
+									onclick={deleteComparison}
+								>
+									<Trash2Icon class="size-4" />
+								</Button>
+								{@render hoverDescription(i18n.t('comparison.delete'))}
+							</span>
+						</div>
+
+						{#if activeComparison}
+							<div class="grid gap-4 lg:grid-cols-[minmax(17rem,21rem)_1fr]">
+								<div class="space-y-4">
+									<div class="space-y-2">
+										<Label class="text-xs uppercase">{i18n.t('comparison.name')}</Label>
+										<Input
+											value={activeComparison.name}
+											oninput={(e) => updateActiveComparison({ name: e.currentTarget.value })}
+										/>
+									</div>
+
+									<div class="{SURFACE_CLASS.inset} space-y-2 rounded-lg p-3 text-sm">
+										<div class="text-muted-foreground text-xs uppercase">
+											{i18n.t('comparison.context')}
+										</div>
+										<div class="font-medium">{comparisonAssetLabel(activeComparison)}</div>
+										<div class="text-muted-foreground text-xs">
+											{activeComparison.period} · {activeComparison.interval} · {formatCurrency(
+												parseFloat(activeComparison.startingCapital) || 0
+											)}
+										</div>
+										<Button
+											variant="outline"
+											size="sm"
+											class="w-full"
+											onclick={applyCurrentSettingsToComparison}
+										>
+											<CheckIcon class="size-3.5" />
+											{i18n.t('comparison.useCurrent')}
+										</Button>
+									</div>
+
+									<div class="space-y-2">
+										<Label class="text-xs uppercase">{i18n.t('comparison.strategies')}</Label>
+										{#each STRATEGIES as strategyType}
+											<div
+												class="border-border grid grid-cols-[auto_1fr_5rem] items-center gap-2 rounded-lg border p-2"
+											>
+												<Checkbox
+													checked={activeComparison.strategies[strategyType].enabled}
+													onCheckedChange={(checked) =>
+														updateComparisonStrategy(strategyType, { enabled: checked })}
+												/>
+												<span class="min-w-0 truncate text-sm">
+													{i18n.t(`strategy.${strategyType}` as 'strategy.sma')}
+												</span>
+												<Input
+													type="number"
+													min="1"
+													value={activeComparison.strategies[strategyType].windowSize}
+													disabled={!activeComparison.strategies[strategyType].enabled}
+													oninput={(e) =>
+														updateComparisonStrategy(strategyType, {
+															windowSize: e.currentTarget.value
+														})}
+												/>
+											</div>
+										{/each}
+									</div>
+
+									<Button
+										class="min-h-10 w-full"
+										disabled={isComparing}
+										onclick={runStrategyComparison}
+									>
+										{#if isComparing}
+											<Loader2Icon class="size-4 animate-spin" />
+										{:else}
+											<SparklesIcon class="size-4" />
+										{/if}
+										{i18n.t('comparison.run')}
+									</Button>
+								</div>
+
+								<div class="space-y-4">
+									<StrategyComparisonChart
+										series={activeComparison.results.map((run) => ({
+											strategy: run.strategy,
+											windowSize: run.windowSize,
+											capitalHistory: run.result.capital_history
+										}))}
+									/>
+
+									<div class="{SURFACE_CLASS.table} overflow-auto rounded-lg border">
+										<Table.Table>
+											<Table.TableHeader>
+												<Table.TableRow>
+													<Table.TableHead>{i18n.t('strategy.label')}</Table.TableHead>
+													<Table.TableHead>{i18n.t('metric.end')}</Table.TableHead>
+													<Table.TableHead>{i18n.t('metric.strategyReturn')}</Table.TableHead>
+													<Table.TableHead>{i18n.t('metric.sharpe')}</Table.TableHead>
+													<Table.TableHead>{i18n.t('metric.drawdown')}</Table.TableHead>
+													<Table.TableHead>{i18n.t('metric.trades')}</Table.TableHead>
+													<Table.TableHead>{i18n.t('metric.winRate')}</Table.TableHead>
+												</Table.TableRow>
+											</Table.TableHeader>
+											<Table.TableBody>
+												{#if activeComparison.results.length === 0}
+													<Table.TableRow>
+														<Table.TableCell colspan={7} class="text-muted-foreground text-center">
+															{i18n.t('comparison.empty')}
+														</Table.TableCell>
+													</Table.TableRow>
+												{:else}
+													{#each activeComparison.results as run (`${run.strategy}-${run.windowSize}`)}
+														<Table.TableRow
+															class="hover:bg-muted/40 cursor-pointer transition-colors"
+															title={i18n.t('comparison.apply')}
+															onclick={() => applyComparisonResult(run)}
+														>
+															<Table.TableCell>
+																{i18n.t(`strategy.${run.strategy}` as 'strategy.sma')} · {run.windowSize}
+															</Table.TableCell>
+															<Table.TableCell
+																>{formatCurrency(run.result.end_capital)}</Table.TableCell
+															>
+															<Table.TableCell class={pnlClass(run.result.profit_loss_percent)}>
+																{signedPercent(run.result.profit_loss_percent)}
+															</Table.TableCell>
+															<Table.TableCell>{run.result.sharpe_ratio.toFixed(2)}</Table.TableCell
+															>
+															<Table.TableCell
+																>{run.result.max_drawdown.toFixed(2)}%</Table.TableCell
+															>
+															<Table.TableCell
+																>{run.result.buy_trades + run.result.sell_trades}</Table.TableCell
+															>
+															<Table.TableCell>{run.result.win_rate.toFixed(1)}%</Table.TableCell>
+														</Table.TableRow>
+													{/each}
+												{/if}
+											</Table.TableBody>
+										</Table.Table>
+									</div>
+								</div>
 							</div>
 						{/if}
 					</div>

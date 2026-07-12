@@ -54,10 +54,37 @@ export type Portfolio = {
 };
 
 export type SimulationPersisted = DashboardSettings & {
+	name?: string;
 	result: BacktestResponse | null;
 	runSnapshot: RunSnapshot | null;
 	analytics: SimulationAnalytics | null;
 	optimizeRuns: OptimizeRun[];
+};
+
+export type StrategyComparisonItem = {
+	enabled: boolean;
+	windowSize: string;
+};
+
+export type StrategyComparisonResult = {
+	strategy: StrategyType;
+	windowSize: string;
+	result: BacktestResponse;
+};
+
+export type StrategyComparison = {
+	id: string;
+	name: string;
+	dataSource: DataSource;
+	ticker: string;
+	portfolioId: string | null;
+	period: Period;
+	interval: Interval;
+	csvText: string;
+	startingCapital: string;
+	feeRate: string;
+	strategies: Record<StrategyType, StrategyComparisonItem>;
+	results: StrategyComparisonResult[];
 };
 
 export type DashboardPersisted = SimulationPersisted & {
@@ -66,6 +93,8 @@ export type DashboardPersisted = SimulationPersisted & {
 	activeSimulationIndex: number;
 	portfolios: Portfolio[];
 	activePortfolioIndex: number;
+	strategyComparisons: StrategyComparison[];
+	activeStrategyComparisonIndex: number;
 };
 
 function isStrategyType(value: unknown): value is StrategyType {
@@ -121,11 +150,81 @@ function parseSimulation(raw: Record<string, unknown>): SimulationPersisted | nu
 	if (!settings) return null;
 	return {
 		...settings,
+		name: typeof raw.name === 'string' ? raw.name : undefined,
 		result: raw.result ?? null,
 		runSnapshot: raw.runSnapshot ?? null,
 		analytics: raw.analytics ?? null,
 		optimizeRuns: Array.isArray(raw.optimizeRuns) ? raw.optimizeRuns : []
 	} as SimulationPersisted;
+}
+
+function defaultComparisonStrategies(): Record<StrategyType, StrategyComparisonItem> {
+	return {
+		sma: { enabled: true, windowSize: '20' },
+		ema: { enabled: true, windowSize: '20' },
+		rsi: { enabled: true, windowSize: '14' },
+		macd: { enabled: false, windowSize: '12' },
+		bollinger: { enabled: false, windowSize: '20' },
+		crossover: { enabled: false, windowSize: '20' }
+	};
+}
+
+function parseComparisonStrategies(raw: unknown): Record<StrategyType, StrategyComparisonItem> {
+	const fallback = defaultComparisonStrategies();
+	if (!raw || typeof raw !== 'object') return fallback;
+	const record = raw as Record<string, unknown>;
+	return Object.fromEntries(
+		Object.entries(fallback).map(([strategy, defaults]) => {
+			const item = record[strategy];
+			if (!item || typeof item !== 'object') return [strategy, defaults];
+			const row = item as Record<string, unknown>;
+			return [
+				strategy,
+				{
+					enabled: typeof row.enabled === 'boolean' ? row.enabled : defaults.enabled,
+					windowSize: typeof row.windowSize === 'string' ? row.windowSize : defaults.windowSize
+				}
+			];
+		})
+	) as Record<StrategyType, StrategyComparisonItem>;
+}
+
+function parseStrategyComparisons(raw: unknown): StrategyComparison[] {
+	if (!Array.isArray(raw)) return [];
+	return raw.flatMap((item) => {
+		if (!item || typeof item !== 'object') return [];
+		const record = item as Record<string, unknown>;
+		const settings = parseSettings({
+			dataSource: record.dataSource,
+			ticker: record.ticker,
+			portfolioId: record.portfolioId,
+			period: record.period,
+			interval: record.interval,
+			csvText: record.csvText,
+			strategy: 'sma',
+			windowSize: '20',
+			startingCapital: record.startingCapital,
+			feeRate: record.feeRate,
+			autoRun: false
+		});
+		if (!settings || typeof record.id !== 'string' || typeof record.name !== 'string') return [];
+		return [
+			{
+				id: record.id,
+				name: record.name,
+				dataSource: settings.dataSource,
+				ticker: settings.ticker,
+				portfolioId: settings.portfolioId,
+				period: settings.period,
+				interval: settings.interval,
+				csvText: settings.csvText,
+				startingCapital: settings.startingCapital,
+				feeRate: settings.feeRate,
+				strategies: parseComparisonStrategies(record.strategies),
+				results: Array.isArray(record.results) ? (record.results as StrategyComparisonResult[]) : []
+			}
+		];
+	});
 }
 
 function parsePortfolios(raw: unknown): Portfolio[] {
@@ -211,6 +310,7 @@ export function readDashboardState(): Partial<DashboardPersisted> {
 				? raw.activeSimulationIndex
 				: 0;
 		const portfolios = parsePortfolios(raw.portfolios);
+		const strategyComparisons = parseStrategyComparisons(raw.strategyComparisons);
 
 		return {
 			...currentSimulation,
@@ -223,6 +323,13 @@ export function readDashboardState(): Partial<DashboardPersisted> {
 				raw.activePortfolioIndex >= 0 &&
 				raw.activePortfolioIndex < Math.max(portfolios.length, 1)
 					? raw.activePortfolioIndex
+					: 0,
+			strategyComparisons,
+			activeStrategyComparisonIndex:
+				typeof raw.activeStrategyComparisonIndex === 'number' &&
+				raw.activeStrategyComparisonIndex >= 0 &&
+				raw.activeStrategyComparisonIndex < Math.max(strategyComparisons.length, 1)
+					? raw.activeStrategyComparisonIndex
 					: 0
 		};
 	} catch {
@@ -261,7 +368,12 @@ export function writeDashboardState(state: Omit<DashboardPersisted, 'v'>): void 
 				})),
 				activeSimulationIndex: payload.activeSimulationIndex,
 				portfolios: payload.portfolios,
-				activePortfolioIndex: payload.activePortfolioIndex
+				activePortfolioIndex: payload.activePortfolioIndex,
+				strategyComparisons: payload.strategyComparisons.map((comparison) => ({
+					...comparison,
+					results: []
+				})),
+				activeStrategyComparisonIndex: payload.activeStrategyComparisonIndex
 			})
 		);
 	} catch {
