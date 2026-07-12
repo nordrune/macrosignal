@@ -39,9 +39,6 @@
 	--chart-range: oklch(0.55 0.2 300);
 	--chart-drawdown-fill: color-mix(in oklch, var(--negative) 5%, transparent);
 
-	--bg-image: url('/bg-samurai.jpg');
-	--bg-scrim: radial-gradient(circle at 50% 30%, rgba(8, 9, 13, 0.45), rgba(8, 9, 13, 0.92));
-
 	/* Glass mix knobs — single source of truth for translucent surfaces */
 	--mix-shell: 56%;
 	--mix-card: 40%;
@@ -163,15 +160,9 @@
 	}
 
 	body {
-		@apply text-foreground overflow-x-clip antialiased;
+		@apply bg-background text-foreground overflow-x-clip antialiased;
 		font-family: system-ui, sans-serif;
 		position: relative;
-		background-color: var(--background);
-		background-image: var(--bg-scrim), var(--bg-image);
-		background-size: cover, cover;
-		background-position: center, center;
-		background-repeat: no-repeat, no-repeat;
-		background-attachment: fixed, fixed;
 	}
 
 	.surface-shell,
