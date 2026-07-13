@@ -67,8 +67,13 @@
 	import { clearTickerPriceCache, getTickerPrices } from '$lib/price-cache';
 	import {
 		DEFAULT_WINDOW,
+		formatStrategyParamSummary,
+		getDefaultStrategyParamValues,
 		getLegendConfig,
+		getStrategyParamDefinitions,
 		getStrategyParams,
+		normalizeStrategyParamValues,
+		primaryStrategyWindow,
 		type StrategyType
 	} from '$lib/strategy';
 	import type { DataSource, Interval, Period, StatusType } from '$lib/types';
@@ -317,12 +322,36 @@
 
 	function defaultComparisonStrategies(): StrategyComparison['strategies'] {
 		return {
-			sma: { enabled: true, windowSize: windowSize || '20' },
-			ema: { enabled: true, windowSize: windowSize || '20' },
-			rsi: { enabled: true, windowSize: '14' },
-			macd: { enabled: false, windowSize: '12' },
-			bollinger: { enabled: false, windowSize: '20' },
-			crossover: { enabled: false, windowSize: '20' }
+			sma: {
+				enabled: true,
+				params: getDefaultStrategyParamValues('sma', windowSize || '20'),
+				windowSize: windowSize || '20'
+			},
+			ema: {
+				enabled: true,
+				params: getDefaultStrategyParamValues('ema', windowSize || '20'),
+				windowSize: windowSize || '20'
+			},
+			rsi: {
+				enabled: true,
+				params: getDefaultStrategyParamValues('rsi'),
+				windowSize: '14'
+			},
+			macd: {
+				enabled: false,
+				params: getDefaultStrategyParamValues('macd'),
+				windowSize: '12'
+			},
+			bollinger: {
+				enabled: false,
+				params: getDefaultStrategyParamValues('bollinger'),
+				windowSize: '20'
+			},
+			crossover: {
+				enabled: false,
+				params: getDefaultStrategyParamValues('crossover'),
+				windowSize: '20'
+			}
 		};
 	}
 
@@ -408,12 +437,38 @@
 		patch: Partial<StrategyComparison['strategies'][StrategyType]>
 	) {
 		if (!activeComparison) return;
+		const current = activeComparison.strategies[strategyType];
+		const params = patch.params
+			? normalizeStrategyParamValues(
+					strategyType,
+					patch.params,
+					patch.windowSize ?? current.windowSize
+				)
+			: current.params;
 		updateActiveComparison({
 			strategies: {
 				...activeComparison.strategies,
-				[strategyType]: { ...activeComparison.strategies[strategyType], ...patch }
+				[strategyType]: {
+					...current,
+					...patch,
+					params,
+					windowSize: patch.windowSize ?? primaryStrategyWindow(params)
+				}
 			},
 			results: []
+		});
+	}
+
+	function updateComparisonStrategyParam(strategyType: StrategyType, key: string, value: string) {
+		if (!activeComparison) return;
+		const current = activeComparison.strategies[strategyType];
+		const params = normalizeStrategyParamValues(strategyType, {
+			...current.params,
+			[key]: value
+		});
+		updateComparisonStrategy(strategyType, {
+			params,
+			windowSize: primaryStrategyWindow(params)
 		});
 	}
 
@@ -786,10 +841,14 @@
 		feeRate: string;
 		strategy: StrategyType;
 		windowSize: string;
+		strategyParams?: Record<string, string>;
 	}) {
 		const capital = parseFloat(settings.startingCapital);
 		const fee = parseFloat(settings.feeRate);
-		const strategyParams = getStrategyParams(settings.strategy, settings.windowSize);
+		const strategyParams = getStrategyParams(
+			settings.strategy,
+			settings.strategyParams ?? settings.windowSize
+		);
 
 		if (Number.isNaN(capital) || capital <= 0) throw new Error(i18n.t('error.capital'));
 		if (Number.isNaN(fee) || fee < 0) throw new Error(i18n.t('error.fee'));
@@ -853,15 +912,22 @@
 			const runs: StrategyComparisonResult[] = [];
 			for (const strategyType of selected) {
 				const settings = activeComparison.strategies[strategyType];
+				const params = normalizeStrategyParamValues(
+					strategyType,
+					settings.params,
+					settings.windowSize
+				);
 				const built = await buildPayloadFromSettings({
 					...activeComparison,
 					strategy: strategyType,
-					windowSize: settings.windowSize
+					windowSize: primaryStrategyWindow(params),
+					strategyParams: params
 				});
 				if (!built) continue;
 				runs.push({
 					strategy: strategyType,
-					windowSize: settings.windowSize,
+					params,
+					windowSize: primaryStrategyWindow(params),
 					result: await postBacktest(built.payload)
 				});
 			}
@@ -889,6 +955,7 @@
 		feeRate = activeComparison.feeRate;
 		strategy = run.strategy;
 		windowSize = run.windowSize;
+		const runParams = normalizeStrategyParamValues(run.strategy, run.params, run.windowSize);
 		result = run.result;
 		analytics = calculateSimulationAnalytics(run.result);
 		runSnapshot = {
@@ -908,7 +975,7 @@
 			period: activeComparison.dataSource === 'csv' ? '-' : activeComparison.period,
 			interval: activeComparison.dataSource === 'csv' ? '-' : activeComparison.interval,
 			strategy: i18n.t(`strategy.${run.strategy}` as 'strategy.sma'),
-			strategyParams: getStrategyParams(run.strategy, run.windowSize),
+			strategyParams: getStrategyParams(run.strategy, runParams),
 			startingCapital: parseFloat(activeComparison.startingCapital),
 			feePercent: parseFloat(activeComparison.feeRate),
 			dateStart: run.result.series_data[0]?.date ?? '-',
@@ -2489,7 +2556,7 @@
 		{#if comparisonModalOpen}
 			<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3">
 				<section
-					class="{SURFACE_CLASS.shell} border-border flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden overscroll-contain rounded-lg border shadow-2xl"
+					class="{SURFACE_CLASS.shell} border-border flex max-h-[94vh] w-full max-w-[min(96vw,90rem)] flex-col overflow-hidden overscroll-contain rounded-lg border shadow-2xl"
 					aria-labelledby="comparison-title"
 					onwheel={(e) => e.stopPropagation()}
 					ontouchmove={(e) => e.stopPropagation()}
@@ -2578,8 +2645,8 @@
 						</div>
 
 						{#if activeComparison}
-							<div class="grid gap-4 lg:grid-cols-[minmax(17rem,21rem)_1fr]">
-								<div class="space-y-4">
+							<div class="grid min-w-0 gap-4 xl:grid-cols-[minmax(21rem,23rem)_minmax(0,1fr)]">
+								<div class="min-w-0 space-y-4">
 									<div class="space-y-2">
 										<Label class="text-xs uppercase">{i18n.t('comparison.name')}</Label>
 										<Input
@@ -2601,10 +2668,10 @@
 										<Button
 											variant="outline"
 											size="sm"
-											class="w-full"
+											class="min-h-9 w-full text-left leading-snug whitespace-normal"
 											onclick={applyCurrentSettingsToComparison}
 										>
-											<CheckIcon class="size-3.5" />
+											<CheckIcon class="size-3.5 shrink-0" />
 											{i18n.t('comparison.useCurrent')}
 										</Button>
 									</div>
@@ -2612,27 +2679,39 @@
 									<div class="space-y-2">
 										<Label class="text-xs uppercase">{i18n.t('comparison.strategies')}</Label>
 										{#each STRATEGIES as strategyType}
-											<div
-												class="border-border grid grid-cols-[auto_1fr_5rem] items-center gap-2 rounded-lg border p-2"
-											>
-												<Checkbox
-													checked={activeComparison.strategies[strategyType].enabled}
-													onCheckedChange={(checked) =>
-														updateComparisonStrategy(strategyType, { enabled: checked })}
-												/>
-												<span class="min-w-0 truncate text-sm">
-													{i18n.t(`strategy.${strategyType}` as 'strategy.sma')}
-												</span>
-												<Input
-													type="number"
-													min="1"
-													value={activeComparison.strategies[strategyType].windowSize}
-													disabled={!activeComparison.strategies[strategyType].enabled}
-													oninput={(e) =>
-														updateComparisonStrategy(strategyType, {
-															windowSize: e.currentTarget.value
-														})}
-												/>
+											<div class="border-border space-y-2 rounded-lg border p-2">
+												<div class="grid grid-cols-[auto_1fr] items-center gap-2">
+													<Checkbox
+														checked={activeComparison.strategies[strategyType].enabled}
+														onCheckedChange={(checked) =>
+															updateComparisonStrategy(strategyType, { enabled: checked })}
+													/>
+													<span class="min-w-0 truncate text-sm">
+														{i18n.t(`strategy.${strategyType}` as 'strategy.sma')}
+													</span>
+												</div>
+												<div class="grid grid-cols-2 gap-2">
+													{#each getStrategyParamDefinitions(strategyType) as param}
+														<label class="min-w-0 space-y-1">
+															<span class="text-muted-foreground block truncate text-[11px]">
+																{param.label}
+															</span>
+															<Input
+																type="number"
+																min={param.min}
+																step={param.step}
+																value={activeComparison.strategies[strategyType].params[param.key]}
+																disabled={!activeComparison.strategies[strategyType].enabled}
+																oninput={(e) =>
+																	updateComparisonStrategyParam(
+																		strategyType,
+																		param.key,
+																		e.currentTarget.value
+																	)}
+															/>
+														</label>
+													{/each}
+												</div>
 											</div>
 										{/each}
 									</div>
@@ -2651,17 +2730,21 @@
 									</Button>
 								</div>
 
-								<div class="space-y-4">
+								<div class="min-w-0 space-y-4">
 									<StrategyComparisonChart
 										series={activeComparison.results.map((run) => ({
 											strategy: run.strategy,
 											windowSize: run.windowSize,
+											paramSummary: formatStrategyParamSummary(
+												run.strategy,
+												normalizeStrategyParamValues(run.strategy, run.params, run.windowSize)
+											),
 											capitalHistory: run.result.capital_history
 										}))}
 									/>
 
-									<div class="{SURFACE_CLASS.table} overflow-auto rounded-lg border">
-										<Table.Table>
+									<div class="{SURFACE_CLASS.table} min-w-0 overflow-x-auto rounded-lg border">
+										<Table.Table class="min-w-[46rem]">
 											<Table.TableHeader>
 												<Table.TableRow>
 													<Table.TableHead>{i18n.t('strategy.label')}</Table.TableHead>
@@ -2681,14 +2764,26 @@
 														</Table.TableCell>
 													</Table.TableRow>
 												{:else}
-													{#each activeComparison.results as run (`${run.strategy}-${run.windowSize}`)}
+													{#each activeComparison.results as run (`${run.strategy}-${formatStrategyParamSummary(run.strategy, normalizeStrategyParamValues(run.strategy, run.params, run.windowSize))}`)}
 														<Table.TableRow
 															class="hover:bg-muted/40 cursor-pointer transition-colors"
 															title={i18n.t('comparison.apply')}
 															onclick={() => applyComparisonResult(run)}
 														>
 															<Table.TableCell>
-																{i18n.t(`strategy.${run.strategy}` as 'strategy.sma')} · {run.windowSize}
+																<div class="space-y-1">
+																	<div>{i18n.t(`strategy.${run.strategy}` as 'strategy.sma')}</div>
+																	<div class="text-muted-foreground text-xs">
+																		{formatStrategyParamSummary(
+																			run.strategy,
+																			normalizeStrategyParamValues(
+																				run.strategy,
+																				run.params,
+																				run.windowSize
+																			)
+																		)}
+																	</div>
+																</div>
 															</Table.TableCell>
 															<Table.TableCell
 																>{formatCurrency(run.result.end_capital)}</Table.TableCell

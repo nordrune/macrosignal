@@ -6,7 +6,12 @@ import type { SimulationAnalytics } from '$lib/analytics';
 import { SAMPLE_CSV } from '$lib/csv';
 import { DEFAULT_FEE_PERCENT, DEFAULT_STARTING_CAPITAL } from '$lib/defaults';
 import type { RunSnapshot } from '$lib/export';
-import { DEFAULT_WINDOW, type StrategyType } from '$lib/strategy';
+import {
+	DEFAULT_WINDOW,
+	normalizeStrategyParamValues,
+	primaryStrategyWindow,
+	type StrategyType
+} from '$lib/strategy';
 import type { DataSource, Interval, Period } from '$lib/types';
 import { INTERVALS, PERIODS } from '$lib/types';
 
@@ -63,11 +68,13 @@ export type SimulationPersisted = DashboardSettings & {
 
 export type StrategyComparisonItem = {
 	enabled: boolean;
+	params: Record<string, string>;
 	windowSize: string;
 };
 
 export type StrategyComparisonResult = {
 	strategy: StrategyType;
+	params: Record<string, string>;
 	windowSize: string;
 	result: BacktestResponse;
 };
@@ -160,12 +167,28 @@ function parseSimulation(raw: Record<string, unknown>): SimulationPersisted | nu
 
 function defaultComparisonStrategies(): Record<StrategyType, StrategyComparisonItem> {
 	return {
-		sma: { enabled: true, windowSize: '20' },
-		ema: { enabled: true, windowSize: '20' },
-		rsi: { enabled: true, windowSize: '14' },
-		macd: { enabled: false, windowSize: '12' },
-		bollinger: { enabled: false, windowSize: '20' },
-		crossover: { enabled: false, windowSize: '20' }
+		sma: {
+			enabled: true,
+			params: normalizeStrategyParamValues('sma', null, '20'),
+			windowSize: '20'
+		},
+		ema: {
+			enabled: true,
+			params: normalizeStrategyParamValues('ema', null, '20'),
+			windowSize: '20'
+		},
+		rsi: { enabled: true, params: normalizeStrategyParamValues('rsi'), windowSize: '14' },
+		macd: { enabled: false, params: normalizeStrategyParamValues('macd'), windowSize: '12' },
+		bollinger: {
+			enabled: false,
+			params: normalizeStrategyParamValues('bollinger'),
+			windowSize: '20'
+		},
+		crossover: {
+			enabled: false,
+			params: normalizeStrategyParamValues('crossover'),
+			windowSize: '20'
+		}
 	};
 }
 
@@ -178,11 +201,24 @@ function parseComparisonStrategies(raw: unknown): Record<StrategyType, StrategyC
 			const item = record[strategy];
 			if (!item || typeof item !== 'object') return [strategy, defaults];
 			const row = item as Record<string, unknown>;
+			const params =
+				row.params && typeof row.params === 'object'
+					? normalizeStrategyParamValues(
+							strategy as StrategyType,
+							row.params as Record<string, string | number>,
+							typeof row.windowSize === 'string' ? row.windowSize : defaults.windowSize
+						)
+					: normalizeStrategyParamValues(
+							strategy as StrategyType,
+							null,
+							typeof row.windowSize === 'string' ? row.windowSize : defaults.windowSize
+						);
 			return [
 				strategy,
 				{
 					enabled: typeof row.enabled === 'boolean' ? row.enabled : defaults.enabled,
-					windowSize: typeof row.windowSize === 'string' ? row.windowSize : defaults.windowSize
+					params,
+					windowSize: primaryStrategyWindow(params)
 				}
 			];
 		})
@@ -208,6 +244,33 @@ function parseStrategyComparisons(raw: unknown): StrategyComparison[] {
 			autoRun: false
 		});
 		if (!settings || typeof record.id !== 'string' || typeof record.name !== 'string') return [];
+		const results = Array.isArray(record.results)
+			? record.results.flatMap((result) => {
+					if (!result || typeof result !== 'object') return [];
+					const row = result as Record<string, unknown>;
+					if (!isStrategyType(row.strategy) || !row.result) return [];
+					const params =
+						row.params && typeof row.params === 'object'
+							? normalizeStrategyParamValues(
+									row.strategy,
+									row.params as Record<string, string | number>,
+									typeof row.windowSize === 'string' ? row.windowSize : undefined
+								)
+							: normalizeStrategyParamValues(
+									row.strategy,
+									null,
+									typeof row.windowSize === 'string' ? row.windowSize : undefined
+								);
+					return [
+						{
+							strategy: row.strategy,
+							params,
+							windowSize: primaryStrategyWindow(params),
+							result: row.result as BacktestResponse
+						}
+					];
+				})
+			: [];
 		return [
 			{
 				id: record.id,
@@ -221,7 +284,7 @@ function parseStrategyComparisons(raw: unknown): StrategyComparison[] {
 				startingCapital: settings.startingCapital,
 				feeRate: settings.feeRate,
 				strategies: parseComparisonStrategies(record.strategies),
-				results: Array.isArray(record.results) ? (record.results as StrategyComparisonResult[]) : []
+				results
 			}
 		];
 	});

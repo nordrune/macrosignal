@@ -7,6 +7,7 @@
 	type Series = {
 		strategy: StrategyType;
 		windowSize: string;
+		paramSummary?: string;
 		capitalHistory: CapitalPoint[];
 	};
 
@@ -121,7 +122,7 @@
 		{#each chartSeries as item}
 			<span class="flex items-center gap-1.5">
 				<span class="inline-block h-0.5 w-5 rounded-full" style={`background:${item.color}`}></span>
-				{getLegendConfig(item.strategy).label} · {item.windowSize}
+				{getLegendConfig(item.strategy).label} · {item.paramSummary ?? item.windowSize}
 			</span>
 		{/each}
 	</div>
