@@ -5,25 +5,25 @@
 
 :root {
 	color-scheme: dark;
-	--background: oklch(0.12 0.01 260);
+	--background: oklch(0.105 0.008 255);
 	--foreground: oklch(0.95 0.01 260);
-	--card: oklch(0.16 0.015 260);
+	--card: oklch(0.15 0.012 255);
 	--card-foreground: oklch(0.95 0.01 260);
-	--popover: oklch(0.16 0.015 260);
+	--popover: oklch(0.15 0.012 255);
 	--popover-foreground: oklch(0.95 0.01 260);
-	--primary: oklch(0.78 0.14 175);
-	--primary-foreground: oklch(0.15 0.02 260);
-	--secondary: oklch(0.22 0.02 260);
+	--primary: oklch(0.76 0.125 174);
+	--primary-foreground: oklch(0.12 0.015 255);
+	--secondary: oklch(0.2 0.014 255);
 	--secondary-foreground: oklch(0.9 0.01 260);
-	--muted: oklch(0.22 0.015 260);
-	--muted-foreground: oklch(0.65 0.02 260);
-	--accent: oklch(0.24 0.03 260);
+	--muted: oklch(0.2 0.012 255);
+	--muted-foreground: oklch(0.68 0.018 255);
+	--accent: oklch(0.22 0.02 255);
 	--accent-foreground: oklch(0.95 0.01 260);
 	--destructive: oklch(0.6 0.2 25);
-	--border: oklch(0.28 0.02 260);
-	--input: oklch(0.28 0.02 260);
-	--ring: oklch(0.78 0.14 175);
-	--radius: 0.625rem;
+	--border: oklch(0.26 0.014 255);
+	--input: oklch(0.26 0.014 255);
+	--ring: oklch(0.76 0.125 174);
+	--radius: 0.5rem;
 
 	--positive: oklch(0.7 0.17 160);
 	--negative: oklch(0.65 0.2 15);
@@ -36,22 +36,22 @@
 	--chart-grid: var(--border);
 	--chart-label: var(--muted-foreground);
 	--chart-marker-stroke: oklch(0.98 0 0);
-	--chart-range: oklch(0.55 0.2 300);
+	--chart-range: oklch(0.76 0.125 174);
 	--chart-drawdown-fill: color-mix(in oklch, var(--negative) 5%, transparent);
 
 	/* Glass mix knobs — single source of truth for translucent surfaces */
-	--mix-shell: 56%;
-	--mix-card: 40%;
-	--mix-inset: 24%;
-	--mix-control: 14%;
-	--mix-control-active: 20%;
-	--mix-select: 22%;
-	--mix-button: 38%;
-	--mix-button-hover: 48%;
-	--mix-table: 16%;
-	--mix-row-hover: 22%;
-	--mix-row-selected: 30%;
-	--mix-ring: 45%;
+	--mix-shell: 86%;
+	--mix-card: 72%;
+	--mix-inset: 40%;
+	--mix-control: 30%;
+	--mix-control-active: 36%;
+	--mix-select: 34%;
+	--mix-button: 78%;
+	--mix-button-hover: 88%;
+	--mix-table: 32%;
+	--mix-row-hover: 28%;
+	--mix-row-selected: 40%;
+	--mix-ring: 62%;
 
 	--surface-shell: color-mix(in oklch, var(--background) var(--mix-shell), transparent);
 	--surface-card: color-mix(in oklch, var(--card) var(--mix-card), transparent);
@@ -163,6 +163,11 @@
 		@apply bg-background text-foreground overflow-x-clip antialiased;
 		font-family: system-ui, sans-serif;
 		position: relative;
+		background-color: var(--background);
+	}
+
+	a:not([data-slot='button']):visited {
+		color: color-mix(in oklch, var(--primary) 72%, var(--foreground));
 	}
 
 	.surface-shell,
@@ -184,8 +189,8 @@
 	.surface-card {
 		background: var(--surface-card);
 		border-color: var(--surface-ring);
-		-webkit-backdrop-filter: blur(10px) saturate(1.12);
-		backdrop-filter: blur(10px) saturate(1.12);
+		-webkit-backdrop-filter: blur(8px) saturate(1.08);
+		backdrop-filter: blur(8px) saturate(1.08);
 	}
 
 	.surface-inset {
@@ -285,5 +290,281 @@
 	.tooltip-surface {
 		background: var(--tooltip-bg);
 		color: var(--tooltip-fg);
+	}
+
+	.metric-cell {
+		@apply border-border/70 bg-background/45 flex min-w-0 flex-col justify-between rounded-lg border px-3 py-3;
+	}
+
+	.metric-cell-primary {
+		@apply min-h-24;
+	}
+
+	.metric-label {
+		@apply text-muted-foreground flex min-h-7 items-start gap-1 text-[0.68rem] leading-tight font-semibold tracking-wide uppercase;
+	}
+
+	.metric-value {
+		@apply block truncate text-base leading-7 font-semibold tabular-nums;
+		min-height: 1.75rem;
+	}
+
+	.metric-cell-primary .metric-value {
+		@apply text-xl;
+	}
+
+	.empty-workspace {
+		@apply border-border/70 flex min-h-60 flex-col items-center justify-center rounded-lg border px-6 py-8 text-center sm:min-h-64;
+		background: var(--surface-inset);
+		-webkit-backdrop-filter: blur(6px) saturate(1.08);
+		backdrop-filter: blur(6px) saturate(1.08);
+	}
+
+	.language-switch {
+		@apply border-border/80 bg-background/55 rounded-lg border p-0.5;
+		box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--foreground) 3%, transparent);
+	}
+
+	.language-switch-option {
+		@apply min-w-9 rounded-md px-2.5 text-xs font-semibold tracking-normal;
+	}
+
+	.language-switch-option[data-active],
+	.language-switch-option[data-state='active'] {
+		@apply text-primary-foreground;
+		background: color-mix(in oklch, var(--primary) 78%, var(--background));
+		border-color: color-mix(in oklch, var(--primary) 55%, transparent) !important;
+		color: var(--primary-foreground) !important;
+		box-shadow:
+			0 0 0 1px color-mix(in oklch, var(--primary) 55%, transparent),
+			0 8px 18px color-mix(in oklch, var(--primary) 20%, transparent);
+	}
+
+	.language-switch-option[data-active]::before,
+	.language-switch-option[data-state='active']::before {
+		content: '';
+		display: block;
+		width: 0.375rem;
+		height: 0.375rem;
+		flex-shrink: 0;
+		border-radius: 999px;
+		background: color-mix(in oklch, var(--primary-foreground) 92%, transparent);
+	}
+
+	.chart-panel {
+		@apply border-border/70 bg-background/25 relative w-full min-w-0 overflow-hidden rounded-lg border;
+	}
+
+	.settings-card {
+		@apply overflow-hidden;
+	}
+
+	.settings-card-body {
+		@apply space-y-4;
+	}
+
+	.settings-block {
+		@apply border-border/70 bg-background/28 rounded-lg border p-3;
+	}
+
+	.settings-block-header {
+		@apply mb-3 flex min-h-6 items-center justify-between gap-2;
+	}
+
+	.settings-eyebrow {
+		@apply text-muted-foreground text-xs font-semibold tracking-wide uppercase;
+	}
+
+	.binary-switch {
+		@apply grid grid-cols-2 gap-1 rounded-lg border p-[3px];
+		background: var(--surface-control);
+		border-color: var(--surface-ring);
+		-webkit-backdrop-filter: blur(8px) saturate(1.1);
+		backdrop-filter: blur(8px) saturate(1.1);
+	}
+
+	.binary-switch-option {
+		@apply text-muted-foreground inline-flex min-w-0 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-transparent px-2 text-xs leading-none font-semibold whitespace-nowrap transition-colors outline-none;
+	}
+
+	.binary-switch-option[data-active]:not([data-active='false']),
+	.binary-switch-option[data-state='active'] {
+		border-color: color-mix(in oklch, var(--primary) 48%, var(--border));
+		background: color-mix(in oklch, var(--primary) 14%, var(--surface-control-active));
+		color: var(--foreground) !important;
+	}
+
+	.binary-switch-option svg {
+		color: var(--primary);
+	}
+
+	.binary-switch-option:focus-visible {
+		border-color: var(--ring);
+		box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 42%, transparent);
+	}
+
+	.switch-context {
+		@apply text-muted-foreground mt-2 min-h-4 text-xs leading-snug;
+	}
+
+	.mode-panel {
+		@apply border-border/70 bg-background/20 space-y-3 rounded-lg border p-3;
+	}
+
+	.selected-source-summary {
+		@apply border-border/70 bg-background/28 flex min-h-12 items-center justify-between gap-2 rounded-lg border px-3 py-2;
+	}
+
+	.brand-mark {
+		@apply inline-flex shrink-0 items-center justify-center overflow-hidden rounded-md border text-[0.64rem] leading-none font-black tabular-nums;
+		letter-spacing: 0;
+	}
+
+	.brand-mark-has-icon {
+		background: oklch(0.98 0 0);
+		border-color: color-mix(in oklch, var(--foreground) 16%, var(--border));
+		color: var(--background);
+	}
+
+	.brand-mark-img {
+		@apply block size-[78%] object-contain;
+	}
+
+	.brand-mark-fallback {
+		@apply inline-flex items-center justify-center;
+	}
+
+	.brand-mark-has-icon .brand-mark-fallback {
+		display: none;
+	}
+
+	.brand-mark-has-icon[data-icon-failed='true'] {
+		background: color-mix(in oklch, var(--muted) 35%, transparent);
+		color: var(--muted-foreground);
+	}
+
+	.brand-mark-has-icon[data-icon-failed='true'] .brand-mark-img {
+		display: none;
+	}
+
+	.brand-mark-has-icon[data-icon-failed='true'] .brand-mark-fallback {
+		@apply inline-flex;
+	}
+
+	.brand-mark-md {
+		@apply size-8;
+	}
+
+	.brand-mark-sm {
+		@apply size-7 text-[0.58rem];
+	}
+
+	.brand-mark-xs {
+		@apply size-5 text-[0.48rem];
+	}
+
+	.brand-mark[data-category='Crypto'] {
+		border-color: color-mix(in oklch, var(--warning) 42%, var(--border));
+		background: color-mix(in oklch, var(--warning) 15%, transparent);
+		color: var(--warning);
+	}
+
+	.brand-mark[data-category='Stocks'] {
+		border-color: color-mix(in oklch, var(--primary) 42%, var(--border));
+		background: color-mix(in oklch, var(--primary) 13%, transparent);
+		color: var(--primary);
+	}
+
+	.brand-mark[data-category='ETFs'] {
+		border-color: color-mix(in oklch, oklch(0.72 0.14 245) 45%, var(--border));
+		background: color-mix(in oklch, oklch(0.72 0.14 245) 14%, transparent);
+		color: oklch(0.78 0.12 245);
+	}
+
+	.brand-mark[data-category='Indices'] {
+		border-color: color-mix(in oklch, oklch(0.78 0.12 300) 40%, var(--border));
+		background: color-mix(in oklch, oklch(0.78 0.12 300) 13%, transparent);
+		color: oklch(0.82 0.1 300);
+	}
+
+	.brand-mark[data-category='Forex'] {
+		border-color: color-mix(in oklch, var(--positive) 42%, var(--border));
+		background: color-mix(in oklch, var(--positive) 12%, transparent);
+		color: var(--positive);
+	}
+
+	.brand-mark[data-category='Commodities'] {
+		border-color: color-mix(in oklch, oklch(0.78 0.15 65) 45%, var(--border));
+		background: color-mix(in oklch, oklch(0.78 0.15 65) 13%, transparent);
+		color: oklch(0.82 0.14 65);
+	}
+
+	.brand-mark[data-category='Custom'] {
+		border-color: var(--border);
+		background: color-mix(in oklch, var(--muted) 35%, transparent);
+		color: var(--muted-foreground);
+	}
+
+	.brand-mark.brand-mark-has-icon {
+		background: oklch(0.98 0 0);
+		border-color: color-mix(in oklch, var(--foreground) 16%, var(--border));
+		color: var(--background);
+	}
+
+	.brand-mark.brand-mark-has-icon[data-icon-failed='true'] {
+		background: color-mix(in oklch, var(--muted) 35%, transparent);
+		color: var(--muted-foreground);
+	}
+
+	.portfolio-brand-stack {
+		@apply flex shrink-0 items-center;
+	}
+
+	.portfolio-brand-stack .brand-mark + .brand-mark {
+		margin-left: -0.25rem;
+	}
+
+	.run-zone {
+		@apply border-border/70 space-y-3 border-t pt-3;
+	}
+
+	.status-message {
+		@apply flex items-start gap-2 rounded-lg px-3 py-2 text-sm leading-snug;
+	}
+
+	.status-message[data-type='error'] {
+		@apply bg-destructive/12 text-destructive;
+	}
+
+	.status-message[data-type='success'] {
+		@apply bg-primary/12 text-primary;
+	}
+
+	.status-message[data-type='info'] {
+		@apply bg-muted/55 text-muted-foreground;
+	}
+
+	.settings-section {
+		@apply border-border/70 border-t pt-4;
+	}
+
+	.settings-disclosure {
+		@apply border-border/70 border-t pt-3;
+	}
+
+	.settings-disclosure > summary {
+		@apply text-muted-foreground hover:text-foreground flex min-h-9 cursor-pointer list-none items-center justify-between gap-2 rounded-lg px-1 text-sm leading-tight font-medium transition-colors outline-none;
+	}
+
+	.settings-disclosure > summary::-webkit-details-marker {
+		display: none;
+	}
+
+	.settings-disclosure-chevron {
+		transition: transform 150ms ease;
+	}
+
+	.settings-disclosure[open] .settings-disclosure-chevron {
+		transform: rotate(180deg);
 	}
 }

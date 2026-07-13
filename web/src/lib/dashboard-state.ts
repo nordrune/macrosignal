@@ -29,7 +29,7 @@ export const DEFAULT_DASHBOARD_SETTINGS: DashboardSettings = {
 	windowSize: String(DEFAULT_WINDOW),
 	startingCapital: String(DEFAULT_STARTING_CAPITAL),
 	feeRate: String(DEFAULT_FEE_PERCENT),
-	autoRun: true
+	autoRun: false
 };
 
 export type DashboardSettings = {
@@ -135,7 +135,6 @@ function parseSettings(raw: Record<string, unknown>): DashboardSettings | null {
 	if (typeof raw.windowSize !== 'string') return null;
 	if (typeof raw.startingCapital !== 'string') return null;
 	if (typeof raw.feeRate !== 'string') return null;
-	if (typeof raw.autoRun !== 'boolean') return null;
 
 	return {
 		dataSource: raw.dataSource,
@@ -148,7 +147,7 @@ function parseSettings(raw: Record<string, unknown>): DashboardSettings | null {
 		windowSize: raw.windowSize,
 		startingCapital: raw.startingCapital,
 		feeRate: raw.feeRate,
-		autoRun: raw.autoRun
+		autoRun: false
 	};
 }
 

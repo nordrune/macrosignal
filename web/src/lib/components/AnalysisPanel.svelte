@@ -1,5 +1,4 @@
 <script lang="ts">
-	import * as Card from '$lib/components/ui/card';
 	import {
 		type AnalysisCard,
 		type DrawdownAnalytics,
@@ -215,7 +214,7 @@
 			<h2 class="text-base font-semibold">{i18n.t('analysis.title')}</h2>
 			{#if loading && !analytics}
 				<div class="skeleton mt-1 h-3 w-64 max-w-full rounded"></div>
-			{:else}
+			{:else if analytics}
 				<p class="text-muted-foreground mt-1 text-sm">{summary}</p>
 			{/if}
 		</div>
@@ -242,23 +241,17 @@
 				</h3>
 				<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
 					{#each section.cards as item (item.label)}
-						<Card.Card size="sm">
-							<Card.CardHeader class="pb-0">
-								<Card.CardDescription
-									class="{STABLE_CLASS.label} text-[0.7rem] tracking-wide uppercase"
-								>
-									{item.label}
-								</Card.CardDescription>
-							</Card.CardHeader>
-							<Card.CardContent class="space-y-1">
-								<p class={cn(STABLE_CLASS.value, 'text-base font-semibold', toneClass(item.tone))}>
+						<div class="metric-cell min-h-24">
+							<span class="metric-label">{item.label}</span>
+							<div class="space-y-1">
+								<p class={cn(STABLE_CLASS.value, 'metric-value', toneClass(item.tone))}>
 									{item.value}
 								</p>
 								{#if item.detail}
-									<p class="text-muted-foreground text-xs">{item.detail}</p>
+									<p class="text-muted-foreground truncate text-xs">{item.detail}</p>
 								{/if}
-							</Card.CardContent>
-						</Card.Card>
+							</div>
+						</div>
 					{/each}
 				</div>
 			</div>

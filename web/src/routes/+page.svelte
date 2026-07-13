@@ -86,6 +86,8 @@
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import CircleHelpIcon from '@lucide/svelte/icons/circle-help';
 	import CopyIcon from '@lucide/svelte/icons/copy';
+	import FileTextIcon from '@lucide/svelte/icons/file-text';
+	import LayersIcon from '@lucide/svelte/icons/layers';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import PlusIcon from '@lucide/svelte/icons/plus';
@@ -105,6 +107,217 @@
 	];
 	const STRATEGIES: StrategyType[] = ['sma', 'ema', 'rsi', 'macd', 'bollinger', 'crossover'];
 
+	type MetricItem = {
+		label: string;
+		value: string;
+		tone?: string;
+		tooltip?: string;
+	};
+
+	type AssetCategory = AssetOption['category'];
+	type BrandCategory = AssetCategory | 'Custom';
+
+	const CRYPTO_ICON_CODES: Record<string, string> = {
+		'BTC-USD': 'btc',
+		'ETH-USD': 'eth',
+		'SOL-USD': 'sol',
+		'BNB-USD': 'bnb',
+		'XRP-USD': 'xrp',
+		'ADA-USD': 'ada',
+		'DOGE-USD': 'doge',
+		'AVAX-USD': 'avax',
+		'LINK-USD': 'link',
+		'DOT-USD': 'dot',
+		'TRX-USD': 'trx',
+		'LTC-USD': 'ltc',
+		'BCH-USD': 'bch',
+		'MATIC-USD': 'matic',
+		'UNI7083-USD': 'uni',
+		'ICP-USD': 'icp',
+		'APT21794-USD': 'apt',
+		'ARB11841-USD': 'arb',
+		'ATOM-USD': 'atom',
+		'XLM-USD': 'xlm',
+		'XMR-USD': 'xmr',
+		'ETC-USD': 'etc',
+		'FIL-USD': 'fil'
+	};
+
+	const DIRECT_ICON_URLS: Record<string, string> = {
+		'TON11419-USD': 'https://assets.coingecko.com/coins/images/17980/small/ton_symbol.png',
+		'APT21794-USD': 'https://assets.coingecko.com/coins/images/26455/small/aptos_round.png',
+		'ARB11841-USD': 'https://assets.coingecko.com/coins/images/16547/small/arb.jpg'
+	};
+
+	const SIMPLE_ICON_SLUGS: Record<string, string> = {
+		AAPL: 'apple',
+		NVDA: 'nvidia',
+		GOOGL: 'google',
+		META: 'meta',
+		TSLA: 'tesla',
+		AVGO: 'broadcom',
+		JPM: 'jpmorgan',
+		V: 'visa',
+		LLY: 'elililly',
+		NVO: 'novonordisk',
+		TSM: 'tsmc',
+		ASML: 'asml',
+		AMD: 'amd',
+		INTC: 'intel',
+		QCOM: 'qualcomm',
+		NFLX: 'netflix',
+		ADBE: 'adobe',
+		CRM: 'salesforce',
+		ORCL: 'oracle',
+		CSCO: 'cisco',
+		KO: 'cocacola',
+		PEP: 'pepsi',
+		MCD: 'mcdonalds',
+		WMT: 'walmart',
+		COST: 'costco',
+		PG: 'procterandgamble',
+		JNJ: 'johnsonandjohnson',
+		XOM: 'exxon',
+		CVX: 'chevron',
+		BAC: 'bankofamerica',
+		MA: 'mastercard',
+		PYPL: 'paypal',
+		SHOP: 'shopify',
+		PLTR: 'palantir',
+		ARM: 'arm',
+		'SAP.DE': 'sap',
+		'SIE.DE': 'siemens',
+		'ALV.DE': 'allianz',
+		'DTE.DE': 'deutschetelekom',
+		'MBG.DE': 'mercedes',
+		'BMW.DE': 'bmw',
+		'VOW3.DE': 'volkswagen',
+		'P911.DE': 'porsche',
+		'BAS.DE': 'basf',
+		'BAYN.DE': 'bayer',
+		'DBK.DE': 'deutschebank',
+		'CBK.DE': 'commerzbank',
+		'AIR.PA': 'airbus',
+		'MC.PA': 'lvmh',
+		'RMS.PA': 'hermes',
+		'OR.PA': 'loreal',
+		'NESN.SW': 'nestle',
+		'ROG.SW': 'roche',
+		'NOVN.SW': 'novartis',
+		'SHEL.L': 'shell',
+		'AZN.L': 'astrazeneca',
+		TM: 'toyota',
+		SONY: 'sony'
+	};
+
+	const DOMAIN_ICON_DOMAINS: Record<string, string> = {
+		MSFT: 'microsoft.com',
+		AMZN: 'amazon.com',
+		'BRK-B': 'berkshirehathaway.com',
+		UNH: 'unitedhealthgroup.com',
+		SMCI: 'supermicro.com',
+		'RHM.DE': 'rheinmetall.com',
+		'MUV2.DE': 'munichre.com',
+		BABA: 'alibaba.com',
+		'0700.HK': 'tencent.com',
+		SPY: 'ssga.com',
+		QQQ: 'invesco.com',
+		VTI: 'vanguard.com',
+		VT: 'vanguard.com',
+		'EUNL.DE': 'ishares.com',
+		'IWDA.AS': 'ishares.com',
+		'SWDA.L': 'ishares.com',
+		'XDWD.DE': 'xtrackers.com',
+		'SWRD.L': 'ssga.com',
+		'HMWO.L': 'hsbc.com',
+		'VWCE.DE': 'vanguard.com',
+		'VWRL.AS': 'vanguard.com',
+		'SSAC.L': 'ishares.com',
+		ACWI: 'ishares.com',
+		'IS3N.DE': 'ishares.com',
+		'EIMI.L': 'ishares.com',
+		'SXR8.DE': 'ishares.com',
+		'CSPX.L': 'ishares.com',
+		'VUSA.L': 'vanguard.com',
+		'VUAA.L': 'vanguard.com',
+		'SXRV.DE': 'ishares.com',
+		'EQQQ.L': 'invesco.com',
+		'2B76.DE': 'ishares.com',
+		'2B78.DE': 'ishares.com',
+		'QDVE.DE': 'ishares.com',
+		'IQQH.DE': 'ishares.com',
+		'IH2O.L': 'ishares.com',
+		'SMH.L': 'vaneck.com',
+		XLF: 'ssga.com',
+		XLK: 'ssga.com',
+		XLV: 'ssga.com',
+		XLE: 'ssga.com',
+		XLY: 'ssga.com',
+		XLP: 'ssga.com',
+		XLI: 'ssga.com',
+		XLU: 'ssga.com',
+		XLRE: 'ssga.com',
+		VEA: 'vanguard.com',
+		VWO: 'vanguard.com',
+		TLT: 'ishares.com',
+		GLD: 'spdrgoldshares.com',
+		SLV: 'ishares.com',
+		USO: 'uscfinvestments.com',
+		'^GSPC': 'spglobal.com',
+		'^IXIC': 'nasdaq.com',
+		'^DJI': 'spglobal.com',
+		'^RUT': 'lseg.com',
+		'^VIX': 'cboe.com',
+		'^GDAXI': 'deutsche-boerse.com',
+		'^STOXX50E': 'stoxx.com',
+		'^FTSE': 'lseg.com',
+		'^N225': 'nikkei.com',
+		'^HSI': 'hangsengindexes.com'
+	};
+
+	const ASSET_BRAND_FALLBACKS: Record<string, string> = {
+		'BTC-USD': 'BTC',
+		'ETH-USD': 'ETH',
+		'SOL-USD': 'SOL',
+		'BNB-USD': 'BNB',
+		'XRP-USD': 'XRP',
+		'ADA-USD': 'ADA',
+		'DOGE-USD': 'DOGE',
+		'AVAX-USD': 'AVAX',
+		'LINK-USD': 'LINK',
+		'DOT-USD': 'DOT',
+		'LTC-USD': 'LTC',
+		AAPL: 'A',
+		MSFT: 'MS',
+		NVDA: 'NV',
+		AMZN: 'AM',
+		GOOGL: 'G',
+		META: 'ME',
+		TSLA: 'T',
+		SPY: 'SPY',
+		QQQ: 'QQQ',
+		VTI: 'VTI',
+		'^GSPC': 'S&P',
+		'^IXIC': 'NDQ',
+		'^DJI': 'DJ',
+		'EURUSD=X': 'EUR',
+		'GBPUSD=X': 'GBP',
+		'JPY=X': 'JPY',
+		'CHF=X': 'CHF',
+		'AUDUSD=X': 'AUD',
+		'CAD=X': 'CAD',
+		'NZDUSD=X': 'NZD',
+		'EURGBP=X': 'EUR',
+		'GC=F': 'AU',
+		'SI=F': 'AG',
+		'CL=F': 'WTI',
+		'BZ=F': 'BRN',
+		'NG=F': 'NG',
+		'HG=F': 'CU',
+		'ZC=F': 'CORN',
+		'ZS=F': 'SOY'
+	};
+
 	const i18n = getI18n();
 	const saved = readDashboardState();
 	const initialSimulations = saved.simulations?.length
@@ -123,6 +336,7 @@
 	let portfolioId = $state<string | null>(initialSimulation.portfolioId);
 	let assetSearch = $state(assetSearchLabel(initialSimulation.ticker));
 	let assetDropdownOpen = $state(false);
+	let portfolioDropdownOpen = $state(false);
 	let portfolioAssetSearch = $state<Record<number, string>>({});
 	let openPortfolioAssetIndex = $state<number | null>(null);
 	let period = $state<Period>(initialSimulation.period);
@@ -132,7 +346,6 @@
 	let windowSize = $state(initialSimulation.windowSize);
 	let startingCapital = $state(initialSimulation.startingCapital);
 	let feeRate = $state(initialSimulation.feeRate);
-	let autoRun = $state(initialSimulation.autoRun);
 	let csvDropActive = $state(false);
 	let portfolioModalOpen = $state(false);
 	let portfolios = $state.raw<Portfolio[]>(saved.portfolios ?? []);
@@ -156,14 +369,11 @@
 	let tradeSortKey = $state<TradeSortKey>('date');
 	let tradeSortDir = $state<SortDir>('asc');
 
-	let autoRunTimeout: ReturnType<typeof setTimeout> | undefined;
 	let persistTimeout: ReturnType<typeof setTimeout> | undefined;
 	let activeRequestId = 0;
 	let activeOptimizeRequestId = 0;
 
-	const TICKER_AUTORUN_MS = 800;
-	const DEFAULT_AUTORUN_MS = 350;
-	// ponytail: archived optimizer panel; set true to restore UI and auto-run hook
+	// ponytail: feature flag for the parameter optimizer panel
 	const OPTIMIZER_ENABLED = true;
 
 	const legend = $derived(getLegendConfig(strategy));
@@ -182,14 +392,96 @@
 	const filteredAssetOptions = $derived(filterAssetOptions(assetSearch));
 	const selectedAsset = $derived(findAssetOption(ticker));
 	const sourceTab = $derived(dataSource === 'csv' ? 'csv' : 'market');
+	const assetSelectionActive = $derived(dataSource === 'api' && ticker.trim().length >= 2);
 	const portfolioSelectionActive = $derived(dataSource === 'portfolio' && portfolioId !== null);
 	const activePortfolio = $derived(portfolios[activePortfolioIndex] ?? null);
 	const activeComparison = $derived(strategyComparisons[activeStrategyComparisonIndex] ?? null);
 	const selectedPortfolio = $derived(
 		portfolioId ? (portfolios.find((portfolio) => portfolio.id === portfolioId) ?? null) : null
 	);
+	const portfolioDropdownOptions = $derived(
+		portfolios
+			.map((portfolio, index) => ({ portfolio, index }))
+			.filter(({ portfolio }) => !portfolioSelectionActive || portfolio.id !== portfolioId)
+	);
+	const activeContextLabel = $derived.by(() => {
+		if (dataSource === 'csv') return i18n.t('active.customCsv');
+		if (selectedPortfolio) return selectedPortfolio.name;
+		if (selectedAsset) return selectedAsset.label;
+		return ticker || i18n.t('results.empty');
+	});
+	const activeContextSummary = $derived(
+		`${activeContextLabel} · ${i18n.t(`period.${period}` as 'period.1y')} · ${i18n.t(`strategy.${strategy}` as 'strategy.sma')}`
+	);
+	const resultContextSummary = $derived.by(() => {
+		if (!result || !runSnapshot) return activeContextSummary;
+		const parts = [runSnapshot.asset];
+		if (runSnapshot.period !== '-') parts.push(runSnapshot.period);
+		parts.push(runSnapshot.strategy);
+		return parts.join(' · ');
+	});
 	const totalPortfolioWeight = $derived(
 		activePortfolio?.assets.reduce((sum, asset) => sum + (parseFloat(asset.weight) || 0), 0) ?? 0
+	);
+	const primaryMetrics = $derived.by<MetricItem[]>(() =>
+		result
+			? [
+					{
+						label: i18n.t('metric.end'),
+						value: formatCurrency(result.end_capital)
+					},
+					{
+						label: i18n.t('metric.profit'),
+						value: signedCurrency(result.profit_loss),
+						tone: pnlClass(result.profit_loss)
+					},
+					{
+						label: i18n.t('metric.strategyReturn'),
+						value: signedPercent(result.profit_loss_percent),
+						tone: pnlClass(result.profit_loss_percent),
+						tooltip: i18n.t('metric.strategyReturnTooltip')
+					}
+				]
+			: []
+	);
+	const secondaryMetrics = $derived.by<MetricItem[]>(() =>
+		result
+			? [
+					{
+						label: i18n.t('metric.start'),
+						value: formatCurrency(result.start_capital)
+					},
+					{
+						label: i18n.t('metric.buyHold'),
+						value: signedPercent(result.buy_and_hold_return),
+						tone: pnlClass(result.buy_and_hold_return),
+						tooltip: i18n.t('metric.buyHoldTooltip')
+					},
+					{
+						label: i18n.t('metric.sharpe'),
+						value: result.sharpe_ratio.toFixed(2),
+						tooltip: i18n.t('metric.sharpeTooltip')
+					},
+					{
+						label: i18n.t('metric.drawdown'),
+						value: `${result.max_drawdown.toFixed(2)}%`,
+						tooltip: i18n.t('metric.drawdownTooltip')
+					},
+					{
+						label: i18n.t('metric.winRate'),
+						value: `${result.win_rate.toFixed(1)}%`,
+						tooltip: i18n.t('metric.winRateTooltip')
+					},
+					{
+						label: i18n.t('metric.trades'),
+						value: i18n.t('trade.count', {
+							total: result.buy_trades + result.sell_trades,
+							buy: result.buy_trades,
+							sell: result.sell_trades
+						})
+					}
+				]
+			: []
 	);
 
 	function createId(prefix: string): string {
@@ -211,7 +503,7 @@
 			windowSize: settings.windowSize ?? DEFAULT_DASHBOARD_SETTINGS.windowSize,
 			startingCapital: settings.startingCapital ?? DEFAULT_DASHBOARD_SETTINGS.startingCapital,
 			feeRate: settings.feeRate ?? DEFAULT_DASHBOARD_SETTINGS.feeRate,
-			autoRun: settings.autoRun ?? DEFAULT_DASHBOARD_SETTINGS.autoRun,
+			autoRun: false,
 			result: settings.result ?? null,
 			runSnapshot: settings.runSnapshot ?? null,
 			analytics: settings.analytics ?? null,
@@ -232,7 +524,7 @@
 			windowSize,
 			startingCapital,
 			feeRate,
-			autoRun,
+			autoRun: false,
 			result,
 			runSnapshot,
 			analytics,
@@ -254,6 +546,7 @@
 		portfolioId = simulation.portfolioId;
 		assetSearch = assetSearchLabel(simulation.ticker);
 		assetDropdownOpen = false;
+		portfolioDropdownOpen = false;
 		period = simulation.period;
 		interval = simulation.interval;
 		csvText = simulation.csvText;
@@ -261,7 +554,6 @@
 		windowSize = simulation.windowSize;
 		startingCapital = simulation.startingCapital;
 		feeRate = simulation.feeRate;
-		autoRun = simulation.autoRun;
 		result = simulation.result;
 		runSnapshot = simulation.runSnapshot;
 		analytics = simulation.analytics;
@@ -287,7 +579,6 @@
 		activeSimulationIndex = simulations.length - 1;
 		loadSimulation(activeSimulationIndex);
 		schedulePersist();
-		if (seed.autoRun) scheduleAutoRun();
 	}
 
 	function duplicateSimulation() {
@@ -486,6 +777,10 @@
 		portfolios = [...portfolios, portfolio];
 		activePortfolioIndex = portfolios.length - 1;
 		portfolioId = portfolio.id;
+		ticker = '';
+		assetSearch = '';
+		assetDropdownOpen = false;
+		portfolioDropdownOpen = false;
 		dataSource = 'portfolio';
 		schedulePersist();
 	}
@@ -530,10 +825,33 @@
 		schedulePersist();
 	}
 
+	function portfolioWeightValue(weight: string): number {
+		return Math.max(parseFloat(weight) || 0, 0);
+	}
+
+	function portfolioWeightLimit(index: number): number {
+		if (!activePortfolio) return 100;
+		const otherTotal = activePortfolio.assets.reduce(
+			(sum, asset, assetIndex) =>
+				assetIndex === index ? sum : sum + portfolioWeightValue(asset.weight),
+			0
+		);
+		return Math.max(0, 100 - otherTotal);
+	}
+
+	function clampPortfolioWeight(index: number, weight: string): string {
+		const clamped = Math.min(portfolioWeightValue(weight), portfolioWeightLimit(index));
+		return formatWeight(clamped);
+	}
+
 	function updatePortfolioAsset(index: number, patch: Partial<PortfolioAsset>) {
 		if (!activePortfolio) return;
+		const nextPatch =
+			patch.weight === undefined
+				? patch
+				: { ...patch, weight: clampPortfolioWeight(index, patch.weight) };
 		const assets = activePortfolio.assets.map((asset, i) =>
-			i === index ? { ...asset, ...patch } : asset
+			i === index ? { ...asset, ...nextPatch } : asset
 		);
 		updateActivePortfolio({ ...activePortfolio, assets });
 	}
@@ -669,13 +987,67 @@
 				schedulePersist();
 				return;
 			}
-			scheduleAutoRun(TICKER_AUTORUN_MS);
 			return;
 		}
 		portfolioId = id;
 		assetDropdownOpen = false;
+		portfolioDropdownOpen = false;
 		dataSource = 'portfolio';
-		scheduleAutoRun(TICKER_AUTORUN_MS);
+	}
+
+	function selectedPortfolioLabel(): string {
+		return selectedPortfolio?.name ?? i18n.t('portfolio.noneSelected');
+	}
+
+	function selectedPortfolioAssetCount(): string {
+		return selectedPortfolio
+			? i18n.t('portfolio.assetCount', { count: selectedPortfolio.assets.length })
+			: i18n.t('portfolio.empty');
+	}
+
+	function selectDataSource(next: 'market' | 'csv') {
+		if (next === 'csv') {
+			clearTickerPriceCache();
+			assetDropdownOpen = false;
+			dataSource = 'csv';
+			return;
+		}
+
+		dataSource = portfolioId ? 'portfolio' : 'api';
+	}
+
+	function selectTickerMode() {
+		portfolioId = null;
+		dataSource = 'api';
+		assetSearch = ticker ? assetSearchLabel(ticker) : '';
+		assetDropdownOpen = false;
+		portfolioDropdownOpen = false;
+	}
+
+	function selectPortfolioMode() {
+		ticker = '';
+		assetSearch = '';
+		assetDropdownOpen = false;
+		portfolioDropdownOpen = false;
+		dataSource = 'portfolio';
+		if (!portfolioId && portfolios[activePortfolioIndex]) {
+			portfolioId = portfolios[activePortfolioIndex].id;
+		}
+	}
+
+	function clearAssetSelection() {
+		ticker = '';
+		assetSearch = '';
+		assetDropdownOpen = false;
+		dataSource = 'api';
+		schedulePersist();
+	}
+
+	function clearPortfolioSelection() {
+		portfolioId = null;
+		dataSource = 'portfolio';
+		portfolioDropdownOpen = false;
+		schedulePersist();
 	}
 
 	function findAssetOption(symbol: string): AssetOption | undefined {
@@ -683,9 +1055,57 @@
 		return ASSET_OPTIONS.find((asset) => asset.symbol.toUpperCase() === normalized);
 	}
 
+	function assetBrandCategory(symbol: string, fallback: BrandCategory = 'Custom'): BrandCategory {
+		return findAssetOption(symbol)?.category ?? fallback;
+	}
+
+	function assetBrandIconUrl(symbol: string): string | null {
+		const normalized = normalizeTickerSymbol(symbol);
+		const directUrl = DIRECT_ICON_URLS[normalized];
+		if (directUrl) return directUrl;
+
+		const cryptoCode = CRYPTO_ICON_CODES[normalized];
+		if (cryptoCode) {
+			return `https://cdn.jsdelivr.net/npm/cryptocurrency-icons@0.18.1/svg/color/${cryptoCode}.svg`;
+		}
+
+		const simpleIconSlug = SIMPLE_ICON_SLUGS[normalized];
+		if (simpleIconSlug) return `https://cdn.simpleicons.org/${simpleIconSlug}`;
+
+		const domain = DOMAIN_ICON_DOMAINS[normalized];
+		if (domain) {
+			return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`;
+		}
+
+		return null;
+	}
+
+	function assetBrandText(symbol: string, label = ''): string {
+		const normalized = normalizeTickerSymbol(symbol);
+		const known = ASSET_BRAND_FALLBACKS[normalized];
+		if (known) return known;
+		if (normalized.startsWith('^')) return normalized.replace(/^\^/, '').slice(0, 3);
+		if (normalized.endsWith('=X')) return 'FX';
+		if (normalized.endsWith('=F')) return 'CMD';
+
+		const cleanSymbol = normalized.replace(/[^A-Z0-9]/g, '');
+		const source = label || cleanSymbol;
+		const initials = source
+			.split(/\s+/)
+			.filter(Boolean)
+			.map((part) => part[0])
+			.join('')
+			.slice(0, 3);
+		return (initials || cleanSymbol.slice(0, 3) || '?').toUpperCase();
+	}
+
+	function assetOptionLabel(asset: AssetOption): string {
+		return `${asset.label} (${asset.symbol})`;
+	}
+
 	function assetSearchLabel(symbol: string): string {
 		const asset = findAssetOption(symbol);
-		return asset ? `${asset.label} (${asset.symbol})` : symbol;
+		return asset ? assetOptionLabel(asset) : symbol;
 	}
 
 	function normalizeTickerSymbol(value: string): string {
@@ -696,13 +1116,26 @@
 		return /^[A-Z0-9.^=-]{2,18}$/.test(normalizeTickerSymbol(value));
 	}
 
+	function normalizeAssetSearchTerm(value: string): string {
+		return value.trim().toLowerCase().replace(/[()]/g, ' ').replace(/\s+/g, ' ');
+	}
+
+	function isAssetDisplayLabel(query: string): boolean {
+		const normalized = normalizeAssetSearchTerm(query);
+		return ASSET_OPTIONS.some(
+			(asset) => normalized === normalizeAssetSearchTerm(assetOptionLabel(asset))
+		);
+	}
+
 	function filterAssetOptions(query: string): AssetOption[] {
-		const normalized = query.trim().toLowerCase();
-		if (!normalized) return ASSET_OPTIONS;
+		const normalized = normalizeAssetSearchTerm(query);
+		if (!normalized || isAssetDisplayLabel(query)) return ASSET_OPTIONS;
+		const tokens = normalized.split(' ').filter(Boolean);
 		return ASSET_OPTIONS.filter((asset) => {
-			const haystack =
-				`${asset.label} ${asset.symbol} ${asset.category} ${asset.aliases?.join(' ') ?? ''}`.toLowerCase();
-			return haystack.includes(normalized);
+			const haystack = normalizeAssetSearchTerm(
+				`${asset.label} ${asset.symbol} ${asset.category} ${asset.aliases?.join(' ') ?? ''}`
+			);
+			return tokens.every((token) => haystack.includes(token));
 		});
 	}
 
@@ -756,19 +1189,6 @@
 		return error instanceof Error ? error.message : i18n.t('error.backtest');
 	}
 
-	async function runAutoUpdate() {
-		await runBacktest();
-		if (autoRun && OPTIMIZER_ENABLED) await runOptimize();
-	}
-
-	function scheduleAutoRun(delayMs = DEFAULT_AUTORUN_MS) {
-		if (!autoRun) return;
-		clearTimeout(autoRunTimeout);
-		autoRunTimeout = setTimeout(() => {
-			void runAutoUpdate();
-		}, delayMs);
-	}
-
 	function persistDashboard() {
 		const latestSimulations = simulations.map((simulation, index) =>
 			index === activeSimulationIndex ? currentSimulation() : simulation
@@ -785,7 +1205,7 @@
 			windowSize,
 			startingCapital,
 			feeRate,
-			autoRun,
+			autoRun: false,
 			result,
 			runSnapshot,
 			analytics,
@@ -818,7 +1238,6 @@
 		windowSize = DEFAULT_DASHBOARD_SETTINGS.windowSize;
 		startingCapital = DEFAULT_DASHBOARD_SETTINGS.startingCapital;
 		feeRate = DEFAULT_DASHBOARD_SETTINGS.feeRate;
-		autoRun = DEFAULT_DASHBOARD_SETTINGS.autoRun;
 		result = null;
 		runSnapshot = null;
 		analytics = null;
@@ -827,7 +1246,6 @@
 		selectedTradeIndex = null;
 		setStatus(i18n.t('settings.resetDone'), 'info');
 		persistDashboard();
-		scheduleAutoRun();
 	}
 
 	async function buildPayloadFromSettings(settings: {
@@ -1004,6 +1422,13 @@
 	async function runBacktest() {
 		const requestId = ++activeRequestId;
 		const hadResult = result !== null;
+		const runDataSource = dataSource;
+		const runTicker = ticker.trim().toUpperCase();
+		const runSelectedAsset = findAssetOption(runTicker);
+		const runSelectedPortfolio = selectedPortfolio;
+		const runPeriod = period;
+		const runInterval = interval;
+		const runStrategy = strategy;
 		isRunning = true;
 		optimizeRuns = [];
 		if (!hadResult) setStatus(i18n.t('status.running'), 'info');
@@ -1015,8 +1440,8 @@
 				return;
 			}
 			const { payload, strategyParams, capital, fee } = built;
-			const isApi = dataSource === 'api';
-			const isPortfolio = dataSource === 'portfolio';
+			const isApi = runDataSource === 'api';
+			const isPortfolio = runDataSource === 'portfolio';
 
 			const response = await postBacktest(payload);
 			if (requestId !== activeRequestId) return;
@@ -1030,13 +1455,13 @@
 						? i18n.t('source.portfolio')
 						: i18n.t('source.csv'),
 				asset: isApi
-					? ticker.trim().toUpperCase()
+					? (runSelectedAsset?.label ?? runTicker)
 					: isPortfolio
-						? (selectedPortfolio?.name ?? i18n.t('source.portfolio'))
+						? (runSelectedPortfolio?.name ?? i18n.t('source.portfolio'))
 						: i18n.t('active.customCsv'),
-				period: isApi || isPortfolio ? period : '-',
-				interval: isApi || isPortfolio ? interval : '-',
-				strategy: i18n.t(`strategy.${strategy}` as 'strategy.sma'),
+				period: isApi || isPortfolio ? runPeriod : '-',
+				interval: isApi || isPortfolio ? runInterval : '-',
+				strategy: i18n.t(`strategy.${runStrategy}` as 'strategy.sma'),
 				strategyParams,
 				startingCapital: capital,
 				feePercent: fee,
@@ -1090,8 +1515,6 @@
 		const reader = new FileReader();
 		reader.onload = () => {
 			csvText = String(reader.result ?? '');
-			if (autoRun) void runAutoUpdate();
-			else void runBacktest();
 		};
 		reader.readAsText(file);
 	}
@@ -1124,7 +1547,6 @@
 		dataSource = 'api';
 		assetSearch = assetSearchLabel(symbol);
 		assetDropdownOpen = false;
-		scheduleAutoRun(TICKER_AUTORUN_MS);
 	}
 
 	function applyCustomTicker() {
@@ -1135,7 +1557,6 @@
 		dataSource = 'api';
 		assetSearch = assetSearchLabel(symbol);
 		assetDropdownOpen = false;
-		scheduleAutoRun(TICKER_AUTORUN_MS);
 	}
 
 	function handleAssetSearchInput(value: string) {
@@ -1149,7 +1570,6 @@
 		);
 		if (exact) {
 			ticker = exact.symbol;
-			scheduleAutoRun(TICKER_AUTORUN_MS);
 		}
 	}
 
@@ -1176,7 +1596,6 @@
 		windowSize;
 		startingCapital;
 		feeRate;
-		autoRun;
 		result;
 		runSnapshot;
 		analytics;
@@ -1193,9 +1612,7 @@
 	onMount(() => {
 		if (result) {
 			setStatus(i18n.t('status.done'), 'success');
-			return;
 		}
-		if (autoRun) void runAutoUpdate();
 	});
 </script>
 
@@ -1208,32 +1625,61 @@
 	</span>
 {/snippet}
 
+{#snippet assetBrandMark(
+	symbol: string,
+	label = '',
+	category: BrandCategory = 'Custom',
+	size: 'xs' | 'sm' | 'md' = 'md'
+)}
+	{@const iconUrl = assetBrandIconUrl(symbol)}
+	<span
+		class={cn('brand-mark', `brand-mark-${size}`, iconUrl && 'brand-mark-has-icon')}
+		data-category={category}
+		aria-hidden="true"
+	>
+		{#if iconUrl}
+			<img
+				class="brand-mark-img"
+				src={iconUrl}
+				alt=""
+				loading="lazy"
+				decoding="async"
+				onerror={(e) => {
+					e.currentTarget.parentElement?.setAttribute('data-icon-failed', 'true');
+				}}
+			/>
+		{/if}
+		<span class="brand-mark-fallback">{assetBrandText(symbol, label)}</span>
+	</span>
+{/snippet}
+
 <Tooltip.TooltipProvider delayDuration={1000}>
 	<div class="flex min-h-screen min-w-0 flex-col">
-		<header class="{SURFACE_CLASS.shell} border-border/60 border-b">
+		<header class="{SURFACE_CLASS.shell} border-border/60 sticky top-0 z-30 border-b">
 			<div
-				class="mx-auto flex max-w-7xl flex-col items-center gap-2 px-2 py-3 text-center sm:gap-3 sm:px-4 sm:py-4 lg:flex-row lg:items-center lg:justify-between lg:px-6 lg:text-left"
+				class="mx-auto flex max-w-7xl items-center justify-between gap-3 px-3 py-3 sm:px-4 lg:px-6"
 			>
 				<div class="min-w-0">
 					<h1
-						class="from-primary bg-gradient-to-r to-emerald-400 bg-clip-text text-xl font-extrabold tracking-tight text-transparent drop-shadow-[0_0_12px_rgba(0,230,195,0.2)]"
+						class="text-primary flex min-w-0 items-baseline gap-1.5 text-lg leading-tight font-semibold tracking-normal"
 					>
-						MacroSignal <span class="text-foreground/80 text-sm font-medium"
+						<span class="shrink-0">MacroSignal</span>
+						<span class="text-muted-foreground hidden truncate text-xs font-medium sm:inline"
 							>{i18n.t('header.productSuffix')}</span
 						>
 					</h1>
 				</div>
 
-				<div class="flex flex-wrap items-center justify-center gap-2 lg:justify-end">
+				<div class="flex shrink-0 items-center justify-end gap-2">
 					<ExportMenu {result} snapshot={runSnapshot} onError={(msg) => setStatus(msg, 'error')} />
 					<Tabs.Tabs
 						value={i18n.lang}
 						onValueChange={(value) => i18n.setLanguage(value as Lang)}
 						aria-label={i18n.t('language.aria')}
 					>
-						<Tabs.TabsList class="h-8">
-							<Tabs.TabsTrigger value="de" class="px-3 text-xs">DE</Tabs.TabsTrigger>
-							<Tabs.TabsTrigger value="en" class="px-3 text-xs">EN</Tabs.TabsTrigger>
+						<Tabs.TabsList class="language-switch h-8">
+							<Tabs.TabsTrigger value="de" class="language-switch-option">DE</Tabs.TabsTrigger>
+							<Tabs.TabsTrigger value="en" class="language-switch-option">EN</Tabs.TabsTrigger>
 						</Tabs.TabsList>
 					</Tabs.Tabs>
 				</div>
@@ -1241,9 +1687,9 @@
 		</header>
 
 		<main
-			class="mx-auto grid w-full max-w-7xl flex-1 gap-2 px-2 py-3 sm:gap-4 sm:px-4 sm:py-6 lg:grid-cols-[minmax(0,24rem)_1fr] lg:gap-6 lg:px-6"
+			class="mx-auto grid w-full max-w-7xl flex-1 items-start gap-3 px-3 py-4 sm:gap-4 sm:px-4 sm:py-5 lg:grid-cols-[minmax(20rem,22rem)_minmax(0,1fr)] lg:gap-5 lg:px-6"
 		>
-			<Card.Card aria-labelledby="controls-title">
+			<Card.Card aria-labelledby="controls-title" class="settings-card">
 				<Card.CardHeader class="border-b [.border-b]:pb-4">
 					<Card.CardTitle id="controls-title" class="text-base">
 						{i18n.t('section.settings')}
@@ -1266,23 +1712,34 @@
 						</span>
 					</Card.CardAction>
 				</Card.CardHeader>
-				<Card.CardContent class="space-y-5">
-					<div class="border-border flex items-center gap-2 border-b pb-4">
-						<div class="flex min-w-0 flex-1 flex-wrap gap-1.5">
-							{#each simulations as _, index (index)}
-								<span class="group relative inline-flex">
-									<Button
-										variant={index === activeSimulationIndex ? 'default' : 'outline'}
-										size="icon-sm"
-										aria-label={i18n.t('simulation.open', { index: index + 1 })}
-										title={i18n.t('simulation.open', { index: index + 1 })}
-										onclick={() => switchSimulation(index)}
-									>
-										{index + 1}
-									</Button>
-									{@render hoverDescription(i18n.t('simulation.open', { index: index + 1 }))}
+				<Card.CardContent class="settings-card-body">
+					<div class="run-zone border-t-0 pt-0">
+						<Button class="min-h-11 w-full text-sm font-semibold" onclick={runBacktest}>
+							{#if isInitialLoad}
+								<Loader2Icon class="size-4 animate-spin" />
+							{/if}
+							{i18n.t('action.run')}
+						</Button>
+
+						{#if statusMessage}
+							<div class="status-message" data-type={statusType} role="status" aria-live="polite">
+								<span class="stable-icon-slot mt-0.5">
+									{#if statusType === 'success'}
+										<CheckIcon class="size-3.5" />
+									{:else if statusType === 'error'}
+										<XIcon class="size-3.5" />
+									{/if}
 								</span>
-							{/each}
+								<span>{statusMessage}</span>
+							</div>
+						{/if}
+					</div>
+
+					<div class="settings-block">
+						<div class="settings-block-header">
+							<span class="settings-eyebrow">
+								{i18n.t('simulation.label')}
+							</span>
 							<span class="group relative inline-flex">
 								<Button
 									variant="outline"
@@ -1296,302 +1753,443 @@
 								{@render hoverDescription(i18n.t('simulation.add'))}
 							</span>
 						</div>
-						<span class="group relative inline-flex">
-							<Button
-								variant="outline"
-								size="icon-sm"
-								aria-label={i18n.t('simulation.duplicate')}
-								title={i18n.t('simulation.duplicate')}
-								onclick={duplicateSimulation}
-							>
-								<CopyIcon class="size-4" />
-							</Button>
-							{@render hoverDescription(i18n.t('simulation.duplicate'))}
-						</span>
-						<span class="group relative inline-flex">
-							<Button
-								variant="ghost"
-								size="icon-sm"
-								class="hover:text-destructive"
-								disabled={simulations.length <= 1}
-								aria-label={i18n.t('simulation.delete')}
-								title={i18n.t('simulation.delete')}
-								onclick={deleteActiveSimulation}
-							>
-								<Trash2Icon class="size-4" />
-							</Button>
-							{@render hoverDescription(i18n.t('simulation.delete'))}
-						</span>
+						<div class="flex items-center gap-2">
+							<div class="flex min-w-0 flex-1 flex-wrap gap-1.5">
+								{#each simulations as _, index (index)}
+									<span class="group relative inline-flex">
+										<Button
+											variant={index === activeSimulationIndex ? 'default' : 'outline'}
+											size="icon-sm"
+											aria-label={i18n.t('simulation.open', { index: index + 1 })}
+											title={i18n.t('simulation.open', { index: index + 1 })}
+											onclick={() => switchSimulation(index)}
+										>
+											{index + 1}
+										</Button>
+										{@render hoverDescription(i18n.t('simulation.open', { index: index + 1 }))}
+									</span>
+								{/each}
+							</div>
+							<span class="group relative inline-flex">
+								<Button
+									variant="outline"
+									size="icon-sm"
+									aria-label={i18n.t('simulation.duplicate')}
+									title={i18n.t('simulation.duplicate')}
+									onclick={duplicateSimulation}
+								>
+									<CopyIcon class="size-4" />
+								</Button>
+								{@render hoverDescription(i18n.t('simulation.duplicate'))}
+							</span>
+							<span class="group relative inline-flex">
+								<Button
+									variant="outline"
+									size="icon-sm"
+									class="hover:text-destructive"
+									disabled={simulations.length <= 1}
+									aria-label={simulations.length > 1
+										? i18n.t('simulation.delete')
+										: i18n.t('simulation.deleteDisabled')}
+									title={simulations.length > 1
+										? i18n.t('simulation.delete')
+										: i18n.t('simulation.deleteDisabled')}
+									onclick={deleteActiveSimulation}
+								>
+									<Trash2Icon class="size-4" />
+								</Button>
+								{@render hoverDescription(
+									simulations.length > 1
+										? i18n.t('simulation.delete')
+										: i18n.t('simulation.deleteDisabled')
+								)}
+							</span>
+						</div>
 					</div>
-					<div class="space-y-2">
-						<Label class="text-xs uppercase">{i18n.t('simulation.name')}</Label>
-						<Input
-							value={simulations[activeSimulationIndex]?.name ??
-								`Simulation ${activeSimulationIndex + 1}`}
-							oninput={(e) => updateActiveSimulationName(e.currentTarget.value)}
-						/>
-					</div>
-					<div class="space-y-2">
-						<Label class="flex items-center gap-1.5 text-xs uppercase">
-							{i18n.t('source.label')}
-							<Tooltip.Root>
-								<Tooltip.Trigger class="inline-flex">
-									<CircleHelpIcon class="text-muted-foreground size-3.5" />
-								</Tooltip.Trigger>
-								<Tooltip.Content>{i18n.t('source.tooltip')}</Tooltip.Content>
-							</Tooltip.Root>
-						</Label>
+					<div class="settings-block">
+						<div class="settings-block-header">
+							<Label class="settings-eyebrow flex items-center gap-1.5">
+								{i18n.t('source.label')}
+								<Tooltip.Root>
+									<Tooltip.Trigger class="inline-flex">
+										<CircleHelpIcon class="text-muted-foreground size-3.5" />
+									</Tooltip.Trigger>
+									<Tooltip.Content>{i18n.t('source.tooltip')}</Tooltip.Content>
+								</Tooltip.Root>
+							</Label>
+						</div>
 						<Tabs.Tabs
 							value={sourceTab}
-							onValueChange={(value) => {
-								if (value === 'csv') {
-									clearTickerPriceCache();
-									dataSource = 'csv';
-								} else if (dataSource === 'csv') {
-									dataSource = portfolioId ? 'portfolio' : 'api';
-								}
-								scheduleAutoRun();
-							}}
+							onValueChange={(value) => selectDataSource(value === 'csv' ? 'csv' : 'market')}
 						>
-							<Tabs.TabsList class="h-auto w-full">
-								<Tabs.TabsTrigger
-									value="market"
-									class="min-h-10 flex-1 px-2 text-xs whitespace-nowrap"
-									>{i18n.t('source.market')}</Tabs.TabsTrigger
-								>
-								<Tabs.TabsTrigger value="csv" class="min-h-10 flex-1 px-2 text-xs whitespace-nowrap"
-									>{i18n.t('source.csv')}</Tabs.TabsTrigger
-								>
+							<Tabs.TabsList class="binary-switch h-10 w-full" aria-label={i18n.t('source.label')}>
+								<Tabs.TabsTrigger value="market" class="binary-switch-option">
+									<SearchIcon class="size-4" />
+									<span>{i18n.t('source.market')}</span>
+								</Tabs.TabsTrigger>
+								<Tabs.TabsTrigger value="csv" class="binary-switch-option">
+									<FileTextIcon class="size-4" />
+									<span>{i18n.t('source.csv')}</span>
+								</Tabs.TabsTrigger>
 							</Tabs.TabsList>
+							<p class="switch-context">
+								{sourceTab === 'csv' ? i18n.t('source.csvHint') : i18n.t('source.marketHint')}
+							</p>
 
-							<Tabs.TabsContent value="market" class="mt-4 space-y-4">
+							<Tabs.TabsContent value="market" class="mt-3 space-y-3">
 								<div
-									class={cn(
-										'space-y-2 rounded-lg transition-opacity',
-										portfolioSelectionActive && 'opacity-45'
-									)}
-									title={portfolioSelectionActive ? i18n.t('selection.assetBlocked') : undefined}
+									class="binary-switch h-10"
+									role="radiogroup"
+									aria-label={i18n.t('source.assetModeAria')}
 								>
-									<div class="flex items-center justify-between gap-2">
-										<Label class="flex items-center gap-1.5 text-xs uppercase">
-											{i18n.t('ticker.label')}
-											<Tooltip.Root>
-												<Tooltip.Trigger class="inline-flex">
-													<CircleHelpIcon class="text-muted-foreground size-3.5" />
-												</Tooltip.Trigger>
-												<Tooltip.Content>{i18n.t('ticker.tooltip')}</Tooltip.Content>
-											</Tooltip.Root>
-										</Label>
+									<button
+										type="button"
+										class="binary-switch-option"
+										data-active={dataSource !== 'portfolio'}
+										role="radio"
+										aria-checked={dataSource !== 'portfolio'}
+										onclick={selectTickerMode}
+									>
+										<SearchIcon class="size-4" />
+										<span>{i18n.t('ticker.label')}</span>
+									</button>
+									<button
+										type="button"
+										class="binary-switch-option"
+										data-active={dataSource === 'portfolio'}
+										role="radio"
+										aria-checked={dataSource === 'portfolio'}
+										onclick={selectPortfolioMode}
+									>
+										<LayersIcon class="size-4" />
+										<span>{i18n.t('source.portfolio')}</span>
+									</button>
+								</div>
+								<p class="switch-context">
+									{dataSource === 'portfolio'
+										? i18n.t('portfolio.modeHint')
+										: i18n.t('ticker.modeHint')}
+								</p>
+
+								{#if dataSource !== 'portfolio'}
+									<div class="mode-panel">
+										<div class="flex items-center justify-between gap-2">
+											<Label class="flex items-center gap-1.5 text-xs uppercase">
+												{i18n.t('ticker.label')}
+												<Tooltip.Root>
+													<Tooltip.Trigger class="inline-flex">
+														<CircleHelpIcon class="text-muted-foreground size-3.5" />
+													</Tooltip.Trigger>
+													<Tooltip.Content>{i18n.t('ticker.tooltip')}</Tooltip.Content>
+												</Tooltip.Root>
+											</Label>
+											{#if assetSelectionActive}
+												<Button variant="ghost" size="sm" onclick={clearAssetSelection}>
+													<XIcon class="size-3.5" />
+													{i18n.t('selection.clearAsset')}
+												</Button>
+											{/if}
+										</div>
+										<div class="grid gap-2">
+											<div
+												class="relative min-w-0 flex-1"
+												onfocusout={(e) => {
+													const nextTarget = e.relatedTarget;
+													if (
+														!(nextTarget instanceof Node) ||
+														!e.currentTarget.contains(nextTarget)
+													) {
+														assetDropdownOpen = false;
+														assetSearch = assetSearchLabel(ticker);
+													}
+												}}
+											>
+												<SearchIcon
+													class="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
+												/>
+												<Input
+													value={assetSearch}
+													placeholder={i18n.t('ticker.placeholder')}
+													class="h-10 pr-9 pl-9"
+													role="combobox"
+													aria-expanded={assetDropdownOpen}
+													aria-controls="asset-options"
+													onfocus={(e) => {
+														assetDropdownOpen = true;
+														e.currentTarget.select();
+													}}
+													oninput={(e) => {
+														handleAssetSearchInput(e.currentTarget.value);
+													}}
+													onkeydown={handleAssetKeydown}
+												/>
+												<button
+													type="button"
+													class="text-muted-foreground hover:text-foreground absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md"
+													aria-label={i18n.t('ticker.openDropdown')}
+													onclick={() => (assetDropdownOpen = !assetDropdownOpen)}
+												>
+													<ChevronDownIcon class="size-4" />
+												</button>
+												{#if assetDropdownOpen}
+													<div
+														id="asset-options"
+														class="border-border bg-popover text-popover-foreground absolute z-40 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border p-1 shadow-lg"
+														role="listbox"
+														tabindex="-1"
+													>
+														{#if filteredAssetOptions.length}
+															{#each filteredAssetOptions as item (item.symbol)}
+																<button
+																	type="button"
+																	class={cn(
+																		'hover:bg-muted focus:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm outline-none',
+																		item.symbol === ticker && 'bg-muted'
+																	)}
+																	role="option"
+																	aria-selected={item.symbol === ticker}
+																	onmousedown={(e) => e.preventDefault()}
+																	onclick={() => applyTickerSuggestion(item.symbol)}
+																>
+																	{@render assetBrandMark(item.symbol, item.label, item.category)}
+																	<span class="min-w-0 flex-1">
+																		<span class="block truncate font-medium">{item.label}</span>
+																		<span class="text-muted-foreground block truncate text-xs"
+																			>{item.symbol} · {item.category}</span
+																		>
+																	</span>
+																	{#if item.symbol === ticker}
+																		<CheckIcon class="text-primary size-4" />
+																	{/if}
+																</button>
+															{/each}
+														{:else}
+															{#if isTickerLike(assetSearch)}
+																<button
+																	type="button"
+																	class="hover:bg-muted focus:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm outline-none"
+																	onmousedown={(e) => e.preventDefault()}
+																	onclick={applyCustomTicker}
+																>
+																	{@render assetBrandMark(
+																		normalizeTickerSymbol(assetSearch),
+																		i18n.t('ticker.customSymbol')
+																	)}
+																	<span class="min-w-0 flex-1">
+																		<span class="block truncate font-medium"
+																			>{normalizeTickerSymbol(assetSearch)}</span
+																		>
+																		<span class="text-muted-foreground block truncate text-xs"
+																			>{i18n.t('ticker.customSymbol')}</span
+																		>
+																	</span>
+																</button>
+															{:else}
+																<span class="text-muted-foreground block px-2 py-3 text-sm">
+																	{i18n.t('ticker.noResults')}
+																</span>
+															{/if}
+														{/if}
+													</div>
+												{/if}
+											</div>
+										</div>
+										{#if assetSelectionActive}
+											<div class="selected-source-summary">
+												<div class="flex min-w-0 items-center gap-2">
+													{@render assetBrandMark(
+														ticker,
+														selectedAsset?.label ?? ticker,
+														assetBrandCategory(ticker, selectedAsset?.category ?? 'Custom'),
+														'sm'
+													)}
+													<span class="min-w-0">
+														<span class="block truncate text-sm font-medium">
+															{selectedAsset?.label ?? ticker}
+														</span>
+														<span class="text-muted-foreground block truncate text-xs">
+															{selectedAsset
+																? `${selectedAsset.category} · ${selectedAsset.symbol}`
+																: `${i18n.t('ticker.customSymbol')} · ${ticker}`}
+														</span>
+													</span>
+												</div>
+												<span class="shrink-0">{ASSET_OPTIONS.length} Presets</span>
+											</div>
+										{/if}
 									</div>
-									<div class="flex items-stretch gap-2">
+								{:else}
+									<div class="mode-panel">
+										<div class="flex items-center justify-between gap-2">
+											<Label class="text-xs uppercase">{i18n.t('portfolio.select')}</Label>
+											<div class="flex shrink-0 items-center gap-1.5">
+												{#if portfolioSelectionActive}
+													<Button
+														variant="ghost"
+														size="icon-sm"
+														aria-label={i18n.t('selection.clearPortfolio')}
+														title={i18n.t('selection.clearPortfolio')}
+														onclick={clearPortfolioSelection}
+													>
+														<XIcon class="size-3.5" />
+													</Button>
+												{/if}
+												<Button
+													variant="outline"
+													size="icon-sm"
+													aria-label={portfolios.length
+														? i18n.t('portfolio.edit')
+														: i18n.t('portfolio.create')}
+													title={portfolios.length
+														? i18n.t('portfolio.edit')
+														: i18n.t('portfolio.create')}
+													onclick={() => {
+														if (portfolios.length === 0) addPortfolio();
+														portfolioModalOpen = true;
+													}}
+												>
+													{#if portfolios.length}
+														<PencilIcon class="size-3.5" />
+													{:else}
+														<PlusIcon class="size-3.5" />
+													{/if}
+												</Button>
+											</div>
+										</div>
+
 										<div
-											class="relative min-w-0 flex-1"
+											class="relative min-w-0"
 											onfocusout={(e) => {
 												const nextTarget = e.relatedTarget;
 												if (
 													!(nextTarget instanceof Node) ||
 													!e.currentTarget.contains(nextTarget)
 												) {
-													assetDropdownOpen = false;
-													assetSearch = assetSearchLabel(ticker);
+													portfolioDropdownOpen = false;
 												}
 											}}
 										>
-											<SearchIcon
-												class="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
-											/>
-											<Input
-												value={assetSearch}
-												placeholder={i18n.t('ticker.placeholder')}
-												class="h-10 pr-9 pl-9"
-												role="combobox"
-												aria-expanded={assetDropdownOpen}
-												aria-controls="asset-options"
-												disabled={portfolioSelectionActive}
-												onfocus={() => {
-													if (!portfolioSelectionActive) assetDropdownOpen = true;
-												}}
-												oninput={(e) => {
-													if (!portfolioSelectionActive)
-														handleAssetSearchInput(e.currentTarget.value);
-												}}
-												onkeydown={handleAssetKeydown}
-											/>
 											<button
 												type="button"
-												class="text-muted-foreground hover:text-foreground disabled:text-muted-foreground/50 absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md disabled:pointer-events-none"
-												aria-label={i18n.t('ticker.openDropdown')}
-												disabled={portfolioSelectionActive}
-												onclick={() => (assetDropdownOpen = !assetDropdownOpen)}
+												class="border-input bg-input/88 focus-visible:border-ring focus-visible:ring-ring/50 flex h-12 w-full min-w-0 items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm outline-none focus-visible:ring-3"
+												role="combobox"
+												aria-expanded={portfolioDropdownOpen}
+												aria-controls="portfolio-options"
+												onclick={() => {
+													portfolioDropdownOpen = !portfolioDropdownOpen;
+												}}
 											>
-												<ChevronDownIcon class="size-4" />
+												{#if selectedPortfolio}
+													<span class="portfolio-brand-stack" aria-hidden="true">
+														{#each selectedPortfolio.assets.slice(0, 3) as asset, assetIndex (`selected-trigger-${asset.symbol}-${assetIndex}`)}
+															{@render assetBrandMark(
+																asset.symbol,
+																asset.label,
+																assetBrandCategory(asset.symbol),
+																'xs'
+															)}
+														{/each}
+													</span>
+												{:else}
+													<LayersIcon class="text-muted-foreground size-4 shrink-0" />
+												{/if}
+												<span class="min-w-0 flex-1">
+													<span class="block truncate font-medium">{selectedPortfolioLabel()}</span>
+													<span class="text-muted-foreground block truncate text-xs">
+														{selectedPortfolioAssetCount()}
+													</span>
+												</span>
+												<ChevronDownIcon class="text-muted-foreground size-4 shrink-0" />
 											</button>
-											{#if assetDropdownOpen && !portfolioSelectionActive}
+
+											{#if portfolioDropdownOpen}
 												<div
-													id="asset-options"
+													id="portfolio-options"
 													class="border-border bg-popover text-popover-foreground absolute z-40 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border p-1 shadow-lg"
 													role="listbox"
 													tabindex="-1"
 												>
-													{#if filteredAssetOptions.length}
-														{#each filteredAssetOptions as item (item.symbol)}
+													{#if portfolioDropdownOptions.length}
+														{#each portfolioDropdownOptions as { portfolio, index } (portfolio.id)}
 															<button
 																type="button"
 																class={cn(
 																	'hover:bg-muted focus:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm outline-none',
-																	item.symbol === ticker && 'bg-muted'
+																	portfolio.id === portfolioId &&
+																		portfolioSelectionActive &&
+																		'bg-muted'
 																)}
 																role="option"
-																aria-selected={item.symbol === ticker}
+																aria-selected={portfolio.id === portfolioId &&
+																	portfolioSelectionActive}
 																onmousedown={(e) => e.preventDefault()}
-																onclick={() => applyTickerSuggestion(item.symbol)}
+																onclick={() => {
+																	activePortfolioIndex = index;
+																	selectPortfolio(portfolio.id);
+																}}
 															>
-																<span class="min-w-0 flex-1">
-																	<span class="block truncate font-medium">{item.label}</span>
-																	<span class="text-muted-foreground block truncate text-xs"
-																		>{item.symbol} · {item.category}</span
-																	>
+																<span class="portfolio-brand-stack" aria-hidden="true">
+																	{#each portfolio.assets.slice(0, 3) as asset, assetIndex (`${portfolio.id}-${asset.symbol}-${assetIndex}`)}
+																		{@render assetBrandMark(
+																			asset.symbol,
+																			asset.label,
+																			assetBrandCategory(asset.symbol),
+																			'xs'
+																		)}
+																	{/each}
 																</span>
-																{#if item.symbol === ticker}
-																	<CheckIcon class="text-primary size-4" />
+																<span class="min-w-0 flex-1">
+																	<span class="block truncate font-medium">{portfolio.name}</span>
+																	<span class="text-muted-foreground block truncate text-xs">
+																		{i18n.t('portfolio.assetCount', {
+																			count: portfolio.assets.length
+																		})}
+																	</span>
+																</span>
+																{#if portfolio.id === portfolioId && portfolioSelectionActive}
+																	<CheckIcon class="text-primary size-4 shrink-0" />
 																{/if}
 															</button>
 														{/each}
-													{:else}
-														{#if isTickerLike(assetSearch)}
-															<button
-																type="button"
-																class="hover:bg-muted focus:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm outline-none"
-																onmousedown={(e) => e.preventDefault()}
-																onclick={applyCustomTicker}
-															>
-																<span class="min-w-0 flex-1">
-																	<span class="block truncate font-medium"
-																		>{normalizeTickerSymbol(assetSearch)}</span
-																	>
-																	<span class="text-muted-foreground block truncate text-xs"
-																		>{i18n.t('ticker.customSymbol')}</span
-																	>
+													{:else if portfolios.length === 0}
+														<button
+															type="button"
+															class="hover:bg-muted focus:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm outline-none"
+															onmousedown={(e) => e.preventDefault()}
+															onclick={() => {
+																addPortfolio();
+																portfolioDropdownOpen = false;
+																portfolioModalOpen = true;
+															}}
+														>
+															<PlusIcon class="text-primary size-4 shrink-0" />
+															<span class="min-w-0 flex-1">
+																<span class="block truncate font-medium"
+																	>{i18n.t('portfolio.create')}</span
+																>
+																<span class="text-muted-foreground block truncate text-xs">
+																	{i18n.t('portfolio.empty')}
 																</span>
-															</button>
-														{:else}
-															<span class="text-muted-foreground block px-2 py-3 text-sm">
-																{i18n.t('ticker.noResults')}
 															</span>
-														{/if}
+														</button>
+													{:else}
+														<span class="text-muted-foreground block px-2 py-3 text-sm">
+															{i18n.t('portfolio.noOtherOptions')}
+														</span>
 													{/if}
 												</div>
 											{/if}
 										</div>
-										<Button
-											variant="outline"
-											class="h-10 shrink-0 px-3"
-											disabled={isRunning || portfolioSelectionActive}
-											onclick={runBacktest}
-										>
-											{#if isRunning}
-												<Loader2Icon class="size-4 animate-spin" />
-											{/if}
-											{i18n.t('action.loadData')}
-										</Button>
 									</div>
-									<div
-										class="text-muted-foreground flex items-center justify-between gap-2 text-xs"
-									>
-										<span class="min-w-0 truncate"
-											>{selectedAsset
-												? `${selectedAsset.category}: ${selectedAsset.symbol}`
-												: `${i18n.t('ticker.customSymbol')}: ${ticker}`}</span
-										>
-										<span class="shrink-0">{ASSET_OPTIONS.length} Presets</span>
-									</div>
-								</div>
-								<div class="border-border space-y-2 border-t pt-4">
-									<div class="flex items-center justify-between gap-2">
-										<Label class="text-xs uppercase">{i18n.t('portfolio.select')}</Label>
-										<div class="flex items-center gap-1.5">
-											<Button
-												variant="outline"
-												size="sm"
-												onclick={() => {
-													if (portfolios.length === 0) addPortfolio();
-													portfolioModalOpen = true;
-												}}
-											>
-												{portfolios.length ? i18n.t('portfolio.edit') : i18n.t('portfolio.create')}
-											</Button>
-										</div>
-									</div>
-									{#if portfolios.length}
-										<div class="grid gap-1.5">
-											{#each portfolios as portfolio, index (portfolio.id)}
-												<div class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5">
-													<Button
-														variant={portfolio.id === portfolioId && portfolioSelectionActive
-															? 'default'
-															: 'outline'}
-														class="h-auto min-w-0 justify-start px-3 py-2 text-left"
-														title={portfolio.id === portfolioId && portfolioSelectionActive
-															? i18n.t('selection.portfolioToggleOff')
-															: i18n.t('selection.portfolioToggleOn')}
-														onclick={() => {
-															activePortfolioIndex = index;
-															selectPortfolio(portfolio.id);
-														}}
-													>
-														<span class="min-w-0">
-															<span class="block truncate">{portfolio.name}</span>
-															<span class="block truncate text-xs opacity-75"
-																>{portfolio.assets.length} Assets</span
-															>
-														</span>
-													</Button>
-													<div class="flex items-center gap-1">
-														<span class="group relative inline-flex">
-															<Button
-																variant="outline"
-																size="icon-sm"
-																aria-label={i18n.t('portfolio.editOne')}
-																title={i18n.t('portfolio.editOne')}
-																onclick={() => editPortfolio(index)}
-															>
-																<PencilIcon class="size-4" />
-															</Button>
-															{@render hoverDescription(i18n.t('portfolio.editOne'))}
-														</span>
-														<span class="group relative inline-flex">
-															<Button
-																variant="ghost"
-																size="icon-sm"
-																class="hover:text-destructive"
-																aria-label={i18n.t('portfolio.delete')}
-																title={i18n.t('portfolio.delete')}
-																onclick={() => deletePortfolio(index)}
-															>
-																<Trash2Icon class="size-4" />
-															</Button>
-															{@render hoverDescription(i18n.t('portfolio.delete'))}
-														</span>
-													</div>
-												</div>
-											{/each}
-										</div>
-									{:else}
-										<div
-											class="border-border text-muted-foreground rounded-lg border px-3 py-4 text-sm"
-										>
-											{i18n.t('portfolio.empty')}
-										</div>
-									{/if}
-								</div>
-								<div class="grid grid-cols-2 gap-3">
+								{/if}
+								<div class="border-border/70 grid grid-cols-2 gap-3 border-t pt-3">
 									<div class="space-y-2">
 										<Label class="text-xs uppercase">{i18n.t('period.label')}</Label>
-										<PeriodSelect bind:value={period} onchange={scheduleAutoRun} />
+										<PeriodSelect bind:value={period} />
 									</div>
 									<div class="space-y-2">
 										<Label class="text-xs uppercase">{i18n.t('interval.label')}</Label>
-										<IntervalSelect bind:value={interval} onchange={scheduleAutoRun} />
+										<IntervalSelect bind:value={interval} />
 									</div>
 								</div>
 							</Tabs.TabsContent>
@@ -1641,26 +2239,43 @@
 									bind:value={csvText}
 									aria-label={i18n.t('csv.aria')}
 									class="border-input {SURFACE_CLASS.inset} min-h-32 w-full rounded-lg border px-3 py-2 font-mono text-xs"
-									oninput={() => scheduleAutoRun()}
 								></textarea>
 							</Tabs.TabsContent>
 						</Tabs.Tabs>
 					</div>
 
-					<div class="space-y-2">
-						<Label class="flex items-center gap-1.5 text-xs uppercase">
-							{i18n.t('strategy.label')}
-							<Tooltip.Root>
-								<Tooltip.Trigger class="inline-flex">
-									<CircleHelpIcon class="text-muted-foreground size-3.5" />
-								</Tooltip.Trigger>
-								<Tooltip.Content>{i18n.t('strategy.tooltip')}</Tooltip.Content>
-							</Tooltip.Root>
-						</Label>
-						<StrategySelect bind:value={strategy} onchange={scheduleAutoRun} />
+					<div class="settings-block space-y-3">
+						<div class="space-y-2">
+							<Label class="settings-eyebrow flex items-center gap-1.5">
+								{i18n.t('strategy.label')}
+								<Tooltip.Root>
+									<Tooltip.Trigger class="inline-flex">
+										<CircleHelpIcon class="text-muted-foreground size-3.5" />
+									</Tooltip.Trigger>
+									<Tooltip.Content>{i18n.t('strategy.tooltip')}</Tooltip.Content>
+								</Tooltip.Root>
+							</Label>
+							<StrategySelect bind:value={strategy} />
+						</div>
+
+						<div class="space-y-2">
+							<Label class="{STABLE_CLASS.label} flex items-center gap-1.5 text-xs uppercase">
+								{i18n.t(`param.${strategy}Window` as 'param.smaWindow')}
+								<Tooltip.Root>
+									<Tooltip.Trigger class="inline-flex">
+										<CircleHelpIcon class="text-muted-foreground size-3.5" />
+									</Tooltip.Trigger>
+									<Tooltip.Content>
+										{i18n.t(`param.${strategy}Tooltip` as 'param.smaTooltip')}
+									</Tooltip.Content>
+								</Tooltip.Root>
+							</Label>
+							<Input type="number" min="1" bind:value={windowSize} />
+						</div>
 					</div>
 
-					<div class="space-y-2">
+					<!--
+				<div class="space-y-2">
 						<Label class="{STABLE_CLASS.label} flex items-center gap-1.5 text-xs uppercase">
 							{i18n.t(`param.${strategy}Window` as 'param.smaWindow')}
 							<Tooltip.Root>
@@ -1742,7 +2357,6 @@
 						{i18n.t('comparison.open')}
 					</Button>
 
-					<!-- ponytail: archived — parameter optimizer UI; restore with OPTIMIZER_ENABLED -->
 					{#if OPTIMIZER_ENABLED}
 						<div class="border-border space-y-3 border-t pt-4">
 							<div class="flex items-center justify-between gap-2">
@@ -1764,82 +2378,129 @@
 									{/if}
 									{i18n.t('optimizer.run')}
 								</Button>
+	-->
+					<details class="settings-disclosure">
+						<summary>
+							<span>{i18n.t('settings.advanced')}</span>
+							<ChevronDownIcon class="settings-disclosure-chevron size-4 shrink-0" />
+						</summary>
+						<div class="space-y-4 pt-3">
+							<div class="settings-block">
+								<div class="grid grid-cols-2 gap-x-3 gap-y-2">
+									<Label
+										class="{STABLE_CLASS.label} flex items-end gap-1.5 self-end text-xs leading-tight uppercase"
+									>
+										{i18n.t('capital.start')}
+										<Tooltip.Root>
+											<Tooltip.Trigger class="inline-flex shrink-0">
+												<CircleHelpIcon class="text-muted-foreground size-3.5" />
+											</Tooltip.Trigger>
+											<Tooltip.Content>{i18n.t('capital.tooltip')}</Tooltip.Content>
+										</Tooltip.Root>
+									</Label>
+									<Label
+										class="{STABLE_CLASS.label} flex items-end gap-1.5 self-end text-xs leading-tight uppercase"
+									>
+										<span class="line-clamp-2">{i18n.t('fee.label')}</span>
+										<Tooltip.Root>
+											<Tooltip.Trigger class="inline-flex shrink-0">
+												<CircleHelpIcon class="text-muted-foreground size-3.5" />
+											</Tooltip.Trigger>
+											<Tooltip.Content>{i18n.t('fee.tooltip')}</Tooltip.Content>
+										</Tooltip.Root>
+									</Label>
+									<Input type="number" min="1" class="min-w-0" bind:value={startingCapital} />
+									<Input type="number" min="0" step="0.01" class="min-w-0" bind:value={feeRate} />
+								</div>
 							</div>
-							{#if optimizeRuns.length === 0}
-								{#if isOptimizing}
-									<TableSkeleton columns={3} rows={5} />
-								{:else}
-									<div class="flex min-h-52 items-center">
-										<p class="text-muted-foreground text-xs">{i18n.t('optimizer.empty')}</p>
+
+							<!-- ponytail: archived — parameter optimizer UI; restore with OPTIMIZER_ENABLED -->
+							{#if OPTIMIZER_ENABLED}
+								<div class="settings-block space-y-3">
+									<div class="flex items-center justify-between gap-2">
+										<h3
+											class="text-muted-foreground flex min-h-8 items-center gap-2 text-sm leading-tight font-medium"
+										>
+											<SparklesIcon class="size-3.5 shrink-0" />
+											<span class="line-clamp-2">{i18n.t('optimizer.title')}</span>
+										</h3>
+										<Button
+											variant="outline"
+											size="sm"
+											class="shrink-0 whitespace-nowrap"
+											disabled={isOptimizing && optimizeRuns.length === 0}
+											onclick={runOptimize}
+										>
+											{#if isOptimizing}
+												<Loader2Icon class="size-3.5 animate-spin" />
+											{/if}
+											{i18n.t('optimizer.run')}
+										</Button>
 									</div>
-								{/if}
-							{:else}
-								<div class="relative overflow-hidden rounded-lg">
-									<div class="refresh-pending overflow-x-auto" data-pending={isOptimizingRefresh}>
-										<Table.Table>
-											<Table.TableHeader>
-												<Table.TableRow>
-													<Table.TableHead class="text-xs">#</Table.TableHead>
-													<Table.TableHead class="text-xs"
-														>{i18n.t('optimizer.params')}</Table.TableHead
-													>
-													<Table.TableHead class="text-xs"
-														>{i18n.t('optimizer.return')}</Table.TableHead
-													>
-												</Table.TableRow>
-											</Table.TableHeader>
-											<Table.TableBody>
-												{#each optimizeRuns as run, i (i)}
-													<Table.TableRow
-														class="hover:bg-muted/40 cursor-pointer transition-colors"
-														onclick={() => {
-															if (run.params.window !== undefined) {
-																windowSize = String(run.params.window);
-																void runAutoUpdate();
-															}
-														}}
-													>
-														<Table.TableCell class="text-xs">{i + 1}</Table.TableCell>
-														<Table.TableCell class="font-mono text-xs"
-															>{formatKeyValueParams(run.params)}</Table.TableCell
-														>
-														<Table.TableCell
-															class={cn(
-																STABLE_CLASS.value,
-																'text-xs whitespace-nowrap',
-																pnlClass(run.profit_loss_percent)
-															)}
-														>
-															{signedPercent(run.profit_loss_percent)}
-														</Table.TableCell>
-													</Table.TableRow>
-												{/each}
-											</Table.TableBody>
-										</Table.Table>
-									</div>
-									<RefreshOverlay
-										active={isOptimizingRefresh}
-										label={i18n.t('optimizer.running')}
-									/>
+									{#if optimizeRuns.length === 0}
+										{#if isOptimizing}
+											<TableSkeleton columns={3} rows={5} />
+										{:else}
+											<div class="surface-inset flex min-h-20 items-center rounded-lg px-3">
+												<p class="text-muted-foreground text-xs">{i18n.t('optimizer.empty')}</p>
+											</div>
+										{/if}
+									{:else}
+										<div class="relative overflow-hidden rounded-lg">
+											<div
+												class="refresh-pending overflow-x-auto"
+												data-pending={isOptimizingRefresh}
+											>
+												<Table.Table>
+													<Table.TableHeader>
+														<Table.TableRow>
+															<Table.TableHead class="text-xs">#</Table.TableHead>
+															<Table.TableHead class="text-xs"
+																>{i18n.t('optimizer.params')}</Table.TableHead
+															>
+															<Table.TableHead class="text-xs"
+																>{i18n.t('optimizer.return')}</Table.TableHead
+															>
+														</Table.TableRow>
+													</Table.TableHeader>
+													<Table.TableBody>
+														{#each optimizeRuns as run, i (i)}
+															<Table.TableRow
+																class="hover:bg-muted/40 cursor-pointer transition-colors"
+																onclick={() => {
+																	if (run.params.window !== undefined) {
+																		windowSize = String(run.params.window);
+																	}
+																}}
+															>
+																<Table.TableCell class="text-xs">{i + 1}</Table.TableCell>
+																<Table.TableCell class="font-mono text-xs"
+																	>{formatKeyValueParams(run.params)}</Table.TableCell
+																>
+																<Table.TableCell
+																	class={cn(
+																		STABLE_CLASS.value,
+																		'text-xs whitespace-nowrap',
+																		pnlClass(run.profit_loss_percent)
+																	)}
+																>
+																	{signedPercent(run.profit_loss_percent)}
+																</Table.TableCell>
+															</Table.TableRow>
+														{/each}
+													</Table.TableBody>
+												</Table.Table>
+											</div>
+											<RefreshOverlay
+												active={isOptimizingRefresh}
+												label={i18n.t('optimizer.running')}
+											/>
+										</div>
+									{/if}
 								</div>
 							{/if}
 						</div>
-					{/if}
-
-					<div class={STABLE_CLASS.status} role="status" aria-live="polite">
-						{#if statusMessage}
-							<div
-								class={cn(
-									'rounded-lg px-3 py-2 text-sm leading-snug',
-									statusType === 'error' && 'bg-destructive/10 text-destructive',
-									statusType === 'success' && 'bg-primary/10 text-primary',
-									statusType === 'info' && 'bg-muted/50 text-muted-foreground'
-								)}
-							>
-								{statusMessage}
-							</div>
-						{/if}
-					</div>
+					</details>
 				</Card.CardContent>
 			</Card.Card>
 
@@ -1849,11 +2510,9 @@
 						<Card.CardTitle id="results-title" class="text-base"
 							>{i18n.t('results.title')}</Card.CardTitle
 						>
-						{#if !result}
-							<Card.CardDescription class={STABLE_CLASS.subtitle}>
-								{isInitialLoad ? i18n.t('status.running') : i18n.t('results.empty')}
-							</Card.CardDescription>
-						{/if}
+						<Card.CardDescription class={STABLE_CLASS.subtitle}>
+							{isInitialLoad ? i18n.t('status.running') : resultContextSummary}
+						</Card.CardDescription>
 					</div>
 					<span class={STABLE_CLASS.headerAction} role="status">
 						{#if isRefreshing}
@@ -1866,180 +2525,48 @@
 					{#if result}
 						<div class="relative space-y-3 sm:space-y-4">
 							<div
-								class="refresh-pending grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3"
+								class="refresh-pending grid gap-2 sm:grid-cols-3"
 								data-pending={isRefreshing}
 								aria-label={i18n.t('metrics.aria')}
 							>
-								<Card.Card size="sm">
-									<Card.CardHeader class="pb-0">
-										<Card.CardDescription class="{STABLE_CLASS.label} text-[0.7rem] uppercase"
-											>{i18n.t('metric.start')}</Card.CardDescription
-										>
-									</Card.CardHeader>
-									<Card.CardContent
-										><p class="{STABLE_CLASS.value} text-lg font-semibold">
-											{formatCurrency(result.start_capital)}
-										</p></Card.CardContent
-									>
-								</Card.Card>
-								<Card.Card size="sm">
-									<Card.CardHeader class="pb-0">
-										<Card.CardDescription class="{STABLE_CLASS.label} text-[0.7rem] uppercase"
-											>{i18n.t('metric.end')}</Card.CardDescription
-										>
-									</Card.CardHeader>
-									<Card.CardContent
-										><p class="{STABLE_CLASS.value} text-lg font-semibold">
-											{formatCurrency(result.end_capital)}
-										</p></Card.CardContent
-									>
-								</Card.Card>
-								<Card.Card size="sm">
-									<Card.CardHeader class="pb-0">
-										<Card.CardDescription class="{STABLE_CLASS.label} text-[0.7rem] uppercase"
-											>{i18n.t('metric.profit')}</Card.CardDescription
-										>
-									</Card.CardHeader>
-									<Card.CardContent>
-										<p
-											class={cn(
-												STABLE_CLASS.value,
-												'text-lg font-semibold',
-												pnlClass(result.profit_loss)
-											)}
-										>
-											{signedCurrency(result.profit_loss)}
-										</p>
-									</Card.CardContent>
-								</Card.Card>
-								<Card.Card size="sm">
-									<Card.CardHeader class="pb-0">
-										<Card.CardDescription
-											class="{STABLE_CLASS.label} flex items-start gap-1 text-[0.7rem] uppercase"
-										>
-											{i18n.t('metric.strategyReturn')}
-											<Tooltip.Root>
-												<Tooltip.Trigger class="inline-flex">
-													<CircleHelpIcon class="size-3" />
-												</Tooltip.Trigger>
-												<Tooltip.Content>{i18n.t('metric.strategyReturnTooltip')}</Tooltip.Content>
-											</Tooltip.Root>
-										</Card.CardDescription>
-									</Card.CardHeader>
-									<Card.CardContent>
-										<p
-											class={cn(
-												STABLE_CLASS.value,
-												'text-lg font-semibold',
-												pnlClass(result.profit_loss_percent)
-											)}
-										>
-											{signedPercent(result.profit_loss_percent)}
-										</p>
-									</Card.CardContent>
-								</Card.Card>
-								<Card.Card size="sm">
-									<Card.CardHeader class="pb-0">
-										<Card.CardDescription
-											class="{STABLE_CLASS.label} flex items-start gap-1 text-[0.7rem] uppercase"
-										>
-											{i18n.t('metric.sharpe')}
-											<Tooltip.Root>
-												<Tooltip.Trigger class="inline-flex">
-													<CircleHelpIcon class="size-3" />
-												</Tooltip.Trigger>
-												<Tooltip.Content>{i18n.t('metric.sharpeTooltip')}</Tooltip.Content>
-											</Tooltip.Root>
-										</Card.CardDescription>
-									</Card.CardHeader>
-									<Card.CardContent>
-										<p class="{STABLE_CLASS.value} text-lg font-semibold">
-											{result.sharpe_ratio.toFixed(2)}
-										</p>
-									</Card.CardContent>
-								</Card.Card>
-								<Card.Card size="sm">
-									<Card.CardHeader class="pb-0">
-										<Card.CardDescription
-											class="{STABLE_CLASS.label} flex items-start gap-1 text-[0.7rem] uppercase"
-										>
-											{i18n.t('metric.drawdown')}
-											<Tooltip.Root>
-												<Tooltip.Trigger class="inline-flex">
-													<CircleHelpIcon class="size-3" />
-												</Tooltip.Trigger>
-												<Tooltip.Content>{i18n.t('metric.drawdownTooltip')}</Tooltip.Content>
-											</Tooltip.Root>
-										</Card.CardDescription>
-									</Card.CardHeader>
-									<Card.CardContent>
-										<p class="{STABLE_CLASS.value} text-lg font-semibold">
-											{result.max_drawdown.toFixed(2)}%
-										</p>
-									</Card.CardContent>
-								</Card.Card>
-								<Card.Card size="sm">
-									<Card.CardHeader class="pb-0">
-										<Card.CardDescription
-											class="{STABLE_CLASS.label} flex items-start gap-1 text-[0.7rem] uppercase"
-										>
-											{i18n.t('metric.winRate')}
-											<Tooltip.Root>
-												<Tooltip.Trigger class="inline-flex">
-													<CircleHelpIcon class="size-3" />
-												</Tooltip.Trigger>
-												<Tooltip.Content>{i18n.t('metric.winRateTooltip')}</Tooltip.Content>
-											</Tooltip.Root>
-										</Card.CardDescription>
-									</Card.CardHeader>
-									<Card.CardContent>
-										<p class="{STABLE_CLASS.value} text-lg font-semibold">
-											{result.win_rate.toFixed(1)}%
-										</p>
-									</Card.CardContent>
-								</Card.Card>
-								<Card.Card size="sm">
-									<Card.CardHeader class="pb-0">
-										<Card.CardDescription
-											class="{STABLE_CLASS.label} flex items-start gap-1 text-[0.7rem] uppercase"
-										>
-											{i18n.t('metric.buyHold')}
-											<Tooltip.Root>
-												<Tooltip.Trigger class="inline-flex">
-													<CircleHelpIcon class="size-3" />
-												</Tooltip.Trigger>
-												<Tooltip.Content>{i18n.t('metric.buyHoldTooltip')}</Tooltip.Content>
-											</Tooltip.Root>
-										</Card.CardDescription>
-									</Card.CardHeader>
-									<Card.CardContent>
-										<p
-											class={cn(
-												STABLE_CLASS.value,
-												'text-lg font-semibold',
-												pnlClass(result.buy_and_hold_return)
-											)}
-										>
-											{signedPercent(result.buy_and_hold_return)}
-										</p>
-									</Card.CardContent>
-								</Card.Card>
-								<Card.Card size="sm">
-									<Card.CardHeader class="pb-0">
-										<Card.CardDescription class="{STABLE_CLASS.label} text-[0.7rem] uppercase"
-											>{i18n.t('metric.trades')}</Card.CardDescription
-										>
-									</Card.CardHeader>
-									<Card.CardContent>
-										<p class="{STABLE_CLASS.value} text-lg font-semibold">
-											{i18n.t('trade.count', {
-												total: result.buy_trades + result.sell_trades,
-												buy: result.buy_trades,
-												sell: result.sell_trades
-											})}
-										</p>
-									</Card.CardContent>
-								</Card.Card>
+								{#each primaryMetrics as metric (metric.label)}
+									<div class="metric-cell metric-cell-primary">
+										<span class="metric-label">
+											{metric.label}
+											{#if metric.tooltip}
+												<Tooltip.Root>
+													<Tooltip.Trigger class="inline-flex">
+														<CircleHelpIcon class="size-3" />
+													</Tooltip.Trigger>
+													<Tooltip.Content>{metric.tooltip}</Tooltip.Content>
+												</Tooltip.Root>
+											{/if}
+										</span>
+										<span class={cn('metric-value', metric.tone)}>{metric.value}</span>
+									</div>
+								{/each}
+							</div>
+
+							<div
+								class="refresh-pending grid grid-cols-2 gap-2 md:grid-cols-3"
+								data-pending={isRefreshing}
+							>
+								{#each secondaryMetrics as metric (metric.label)}
+									<div class="metric-cell min-h-20">
+										<span class="metric-label">
+											{metric.label}
+											{#if metric.tooltip}
+												<Tooltip.Root>
+													<Tooltip.Trigger class="inline-flex">
+														<CircleHelpIcon class="size-3" />
+													</Tooltip.Trigger>
+													<Tooltip.Content>{metric.tooltip}</Tooltip.Content>
+												</Tooltip.Root>
+											{/if}
+										</span>
+										<span class={cn('metric-value', metric.tone)}>{metric.value}</span>
+									</div>
+								{/each}
 							</div>
 
 							<div
@@ -2141,16 +2668,17 @@
 							<RefreshOverlay active={isRefreshing} label={i18n.t('status.refreshing')} />
 						</div>
 					{:else}
-						<div class="relative">
+						{#if isInitialLoad}
 							<ResultsSkeleton />
-							{#if !isInitialLoad}
-								<p
-									class="text-muted-foreground pointer-events-none absolute inset-0 flex items-center justify-center px-4 text-center text-sm"
-								>
-									{i18n.t('results.empty')}
+						{:else}
+							<div class="empty-workspace">
+								<SearchIcon class="text-primary mb-3 size-5" />
+								<p class="text-foreground text-sm font-medium">{i18n.t('results.emptyTitle')}</p>
+								<p class="text-muted-foreground mt-2 max-w-md text-sm leading-relaxed">
+									{i18n.t('results.emptyHint')}
 								</p>
-							{/if}
-						</div>
+							</div>
+						{/if}
 					{/if}
 				</Card.CardContent>
 			</Card.Card>
@@ -2159,7 +2687,7 @@
 				<Card.CardContent class="pt-6">
 					<AnalysisPanel
 						{analytics}
-						loading={!analytics}
+						loading={!analytics && (isInitialLoad || isRunning)}
 						showEmpty={!analytics && !isInitialLoad && !isRunning}
 					/>
 				</Card.CardContent>
@@ -2177,11 +2705,15 @@
 						<TableSkeleton columns={6} rows={5} />
 					{:else}
 						<div class="{SURFACE_CLASS.table} max-h-96 overflow-auto rounded-lg border">
-							<Table.Table>
+							<Table.Table class={result?.trades.length ? 'sm:min-w-[42rem]' : ''}>
 								<Table.TableHeader class="bg-background/95 sticky top-0 z-10 backdrop-blur-sm">
 									<Table.TableRow>
 										{#each TRADE_COLUMNS as column (column.key)}
 											<Table.TableHead
+												class={cn(
+													(column.key === 'fee' || column.key === 'cashBalance') &&
+														'hidden sm:table-cell'
+												)}
 												aria-sort={tradeSortKey === column.key
 													? tradeSortDir === 'asc'
 														? 'ascending'
@@ -2233,10 +2765,10 @@
 												>
 												<Table.TableCell class="font-mono">{trade.units.toFixed(6)}</Table.TableCell
 												>
-												<Table.TableCell class="font-mono"
+												<Table.TableCell class="hidden font-mono sm:table-cell"
 													>{formatCurrency(trade.fee)}</Table.TableCell
 												>
-												<Table.TableCell class="font-mono"
+												<Table.TableCell class="hidden font-mono sm:table-cell"
 													>{formatCurrency(trade.cashBalance)}</Table.TableCell
 												>
 											</Table.TableRow>
@@ -2268,9 +2800,12 @@
 
 		{#if portfolioModalOpen}
 			<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3">
-				<section
+				<div
 					class="{SURFACE_CLASS.shell} border-border max-h-[92vh] w-full max-w-3xl overflow-hidden overscroll-contain rounded-lg border shadow-2xl"
+					role="dialog"
+					aria-modal="true"
 					aria-labelledby="portfolio-title"
+					tabindex="-1"
 					onwheel={(e) => e.stopPropagation()}
 					ontouchmove={(e) => e.stopPropagation()}
 				>
@@ -2359,20 +2894,31 @@
 									<div class="text-muted-foreground text-sm">
 										{i18n.t('portfolio.weightTotal', { total: totalPortfolioWeight.toFixed(1) })}
 									</div>
-									<span class="group relative inline-flex">
-										<Button
-											variant="outline"
-											size="sm"
-											disabled={activePortfolio.assets.length === 0}
-											aria-label={i18n.t('portfolio.normalize')}
-											title={i18n.t('portfolio.normalizeTooltip')}
-											onclick={normalizePortfolioWeights}
+									<Tooltip.Root>
+										<Tooltip.Trigger>
+											{#snippet child({ props })}
+												<Button
+													{...props}
+													variant="outline"
+													size="sm"
+													disabled={activePortfolio.assets.length === 0}
+													aria-label={i18n.t('portfolio.normalize')}
+													title={i18n.t('portfolio.normalizeTooltip')}
+													onclick={normalizePortfolioWeights}
+												>
+													<SparklesIcon class="size-3.5" />
+													{i18n.t('portfolio.normalize')}
+												</Button>
+											{/snippet}
+										</Tooltip.Trigger>
+										<Tooltip.Content
+											side="top"
+											sideOffset={8}
+											class="max-w-72 text-left leading-snug whitespace-normal"
 										>
-											<SparklesIcon class="size-3.5" />
-											{i18n.t('portfolio.normalize')}
-										</Button>
-										{@render hoverDescription(i18n.t('portfolio.normalizeTooltip'))}
-									</span>
+											{i18n.t('portfolio.normalizeTooltip')}
+										</Tooltip.Content>
+									</Tooltip.Root>
 								</div>
 							</div>
 
@@ -2412,7 +2958,10 @@
 												role="combobox"
 												aria-expanded={openPortfolioAssetIndex === index}
 												aria-controls={`portfolio-asset-options-${index}`}
-												onfocus={() => (openPortfolioAssetIndex = index)}
+												onfocus={(e) => {
+													openPortfolioAssetIndex = index;
+													e.currentTarget.select();
+												}}
 												oninput={(e) => updatePortfolioSymbol(index, e.currentTarget.value)}
 												onkeydown={(e) => handlePortfolioAssetKeydown(e, index, asset)}
 											/>
@@ -2446,6 +2995,7 @@
 																onmousedown={(e) => e.preventDefault()}
 																onclick={() => applyPortfolioAsset(index, item)}
 															>
+																{@render assetBrandMark(item.symbol, item.label, item.category)}
 																<span class="min-w-0 flex-1">
 																	<span class="block truncate font-medium">{item.label}</span>
 																	<span class="text-muted-foreground block truncate text-xs"
@@ -2465,6 +3015,10 @@
 																onmousedown={(e) => e.preventDefault()}
 																onclick={() => applyCustomPortfolioAsset(index)}
 															>
+																{@render assetBrandMark(
+																	normalizeTickerSymbol(portfolioAssetSearchValue(asset, index)),
+																	i18n.t('ticker.customSymbol')
+																)}
 																<span class="min-w-0 flex-1">
 																	<span class="block truncate font-medium"
 																		>{normalizeTickerSymbol(
@@ -2484,14 +3038,23 @@
 													{/if}
 												</div>
 											{/if}
-											<div class="text-muted-foreground mt-1 truncate px-1 text-xs">
-												{asset.label || i18n.t('ticker.customSymbol')}
+											<div
+												class="text-muted-foreground mt-1 flex min-w-0 items-center gap-1.5 px-1 text-xs"
+											>
+												{@render assetBrandMark(
+													asset.symbol,
+													asset.label,
+													assetBrandCategory(asset.symbol),
+													'xs'
+												)}
+												<span class="truncate">{asset.label || i18n.t('ticker.customSymbol')}</span>
 											</div>
 										</div>
 										<div class="grid gap-2">
 											<Input
 												type="number"
 												min="0"
+												max={portfolioWeightLimit(index)}
 												step="0.1"
 												value={asset.weight}
 												oninput={(e) =>
@@ -2500,7 +3063,7 @@
 											<input
 												type="range"
 												min="0"
-												max="100"
+												max={portfolioWeightLimit(index)}
 												step="1"
 												value={asset.weight}
 												aria-label={i18n.t('portfolio.weight')}
@@ -2549,7 +3112,7 @@
 							</div>
 						{/if}
 					</div>
-				</section>
+				</div>
 			</div>
 		{/if}
 

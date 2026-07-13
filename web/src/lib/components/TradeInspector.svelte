@@ -1,5 +1,4 @@
 <script lang="ts">
-	import * as Card from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { getTradeInspectorDetails } from '$lib/analytics';
@@ -37,9 +36,9 @@
 
 {#if visible && details}
 	<div transition:slide={{ duration: 220 }} class="mt-4">
-		<Card.Card>
-			<Card.CardHeader class="flex-row items-center justify-between border-b [.border-b]:pb-3">
-				<Card.CardTitle class="text-sm">{i18n.t('trade.details')}</Card.CardTitle>
+		<section class="border-border/70 bg-background/25 overflow-hidden rounded-lg border">
+			<header class="border-border/70 flex items-center justify-between gap-3 border-b px-3 py-2">
+				<h3 class="text-sm font-medium">{i18n.t('trade.details')}</h3>
 				<Button
 					variant="ghost"
 					size="icon-sm"
@@ -48,22 +47,22 @@
 				>
 					<XIcon class="size-4" />
 				</Button>
-			</Card.CardHeader>
-			<Card.CardContent>
-				<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-					<div class="surface-inset flex flex-col gap-1 rounded-lg p-3">
+			</header>
+			<div class="p-3">
+				<div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+					<div class="surface-inset flex flex-col gap-1 rounded-lg px-3 py-2.5">
 						<span class="text-muted-foreground text-xs">{i18n.t('trade.hold')}</span>
 						<span class="text-sm font-medium"
 							>{i18n.t('trade.days', { count: details.holdDays })}</span
 						>
 					</div>
-					<div class="surface-inset flex flex-col gap-1 rounded-lg p-3">
+					<div class="surface-inset flex flex-col gap-1 rounded-lg px-3 py-2.5">
 						<span class="text-muted-foreground text-xs">{i18n.t('trade.profit')}</span>
 						<span class={cn('text-sm font-medium', pnlClass(details.profit))}>
 							{signedCurrency(details.profit)}
 						</span>
 					</div>
-					<div class="surface-inset flex flex-col gap-1 rounded-lg p-3">
+					<div class="surface-inset flex flex-col gap-1 rounded-lg px-3 py-2.5">
 						<span class="text-muted-foreground flex items-center gap-1 text-xs">
 							{i18n.t('trade.roi')}
 							<Tooltip.Root>
@@ -77,12 +76,12 @@
 							{details.profit > 0 ? '+' : ''}{details.roi.toFixed(2)}%
 						</span>
 					</div>
-					<div class="surface-inset flex flex-col gap-1 rounded-lg p-3">
+					<div class="surface-inset flex flex-col gap-1 rounded-lg px-3 py-2.5">
 						<span class="text-muted-foreground text-xs">{i18n.t('trade.fees')}</span>
 						<span class="text-sm font-medium">{formatCurrency(details.fees)}</span>
 					</div>
 				</div>
-			</Card.CardContent>
-		</Card.Card>
+			</div>
+		</section>
 	</div>
 {/if}

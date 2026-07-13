@@ -465,9 +465,7 @@
 <svelte:window onresize={handleResize} />
 
 <div class="relative min-w-0 space-y-2">
-	<div
-		class="border-border surface-card relative h-52 w-full min-w-0 overflow-hidden rounded-md border sm:h-56 sm:rounded-lg md:h-64"
-	>
+	<div class="chart-panel h-52 sm:h-56 md:h-64">
 		<canvas
 			bind:this={priceCanvas}
 			class="h-full w-full cursor-crosshair touch-none"
@@ -486,9 +484,7 @@
 		></div>
 	</div>
 
-	<div
-		class="border-border surface-card h-24 w-full min-w-0 overflow-hidden rounded-md border sm:h-28 sm:rounded-lg"
-	>
+	<div class="chart-panel h-24 sm:h-28">
 		<canvas
 			bind:this={indicatorCanvas}
 			class="h-full w-full cursor-crosshair touch-none"
