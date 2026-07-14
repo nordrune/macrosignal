@@ -11,12 +11,12 @@ cd "$root"
 role="${1:?usage: prod.sh api|web [dev|prod]}"
 mode="${2:-dev}"
 
-if [[ -f web/build/index.js ]]; then
+if [[ -f web/package.json ]]; then
   layout=main
 elif [[ -d frontend ]]; then
   layout=checkpoint
 else
-  echo "error: unknown layout (need web/build or frontend/)" >&2
+  echo "error: unknown layout (need web/ or frontend/)" >&2
   exit 1
 fi
 
@@ -48,6 +48,10 @@ case "${role}:${layout}" in
     ;;
   web:main)
     if $is_prod; then
+      if [[ ! -f web/build/index.js ]]; then
+        echo "error: missing production web build (run: devenv tasks run build:web)" >&2
+        exit 1
+      fi
       exec env HOST="$HOST" PORT="$WEB_PORT" API_ORIGIN="$API_ORIGIN" \
         bun web/build/index.js
     fi
