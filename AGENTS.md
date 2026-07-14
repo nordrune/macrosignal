@@ -21,6 +21,7 @@ Repo: https://github.com/nordrune/macrosignal
 - Web QA: `devenv tasks run qa:web` or `cd web && bun run qa` (Oxc + `svelte-check`)
 - Python QA: `ruff` + `ty`; full gate: `devenv test` (pre-push hook)
 - Prod web build: `devenv tasks run build:web` → `web/build/` (gitignored)
+- Runtime: `scripts/prod.sh` is tracked (dev + prod entrypoint for `devenv up` and systemd); `deploy.sh` and `devenv.local.nix` stay local (secrets/hosts)
 
 ## User preferences
 
